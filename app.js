@@ -883,6 +883,7 @@ function htmlAjustes() {
       '<div class="campo"><label for="a-preco">Valor de cada número (R$)</label><input id="a-preco" type="text" inputmode="decimal" value="' + String(cfg.preco).replace('.', ',') + '"></div>' +
       '<div class="campo"><label for="a-faixas">Seus números</label><input id="a-faixas" type="text" autocomplete="off" value="' + esc(cfg.faixas) + '"><p class="dica">Escreva o primeiro e o último número de cada sequência, separados por vírgula. Ex.: 19201-19300, 19351-19500. Confira na lista de blocos do PDF da Formô.</p><p class="blocos-prev" id="a-faixas-info"></p></div>' +
       '<div class="campo"><label for="a-titulo">Título da página</label><input id="a-titulo" type="text" value="' + esc(cfg.titulo) + '"></div>' +
+      '<div class="campo"><label for="a-link">Link pra divulgar</label><input id="a-link" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://tinyurl.com/..." value="' + esc(cfg.link) + '"><p class="dica">É o link do botão “Copiar link” e das mensagens de divulgação.</p></div>' +
       '<div class="campo"><label for="a-prazo">Prazo pra pagar uma reserva</label><select id="a-prazo">' + [12, 24, 48, 72].map(h => '<option value="' + h + '"' + (Number(cfg.prazoReserva || 24) === h ? ' selected' : '') + '>' + (h >= 48 ? (h / 24) + ' dias' : h + ' horas') + '</option>').join('') + '</select><p class="dica">Depois desse prazo sem pagamento, a venda aparece como “Reserva vencida” pra você cobrar ou liberar os números.</p></div>' +
       '<label class="opcao" for="a-contador"><input id="a-contador" type="checkbox"' + (cfg.mostrarContador ? ' checked' : '') + '><span>Mostrar quantos números ainda estão livres</span></label>' +
     '</fieldset>' +
@@ -921,9 +922,11 @@ async function salvarAjustes() {
     pixTipo: $('#a-pix-tipo').value, pixChave: $('#a-pix-chave').value.trim(), pixNome: $('#a-pix-nome').value.trim(), pixCidade: $('#a-pix-cidade').value.trim(),
     preco: lerPreco($('#a-preco').value), faixas: $('#a-faixas').value.trim(),
     titulo: $('#a-titulo').value.trim() || CFG_PADRAO.titulo,
+    link: (() => { const l = (($('#a-link') || {}).value || '').trim().replace(/\s+/g, ''); return l && !/^https?:\/\//i.test(l) ? 'https://' + l : l; })(),
     mostrarContador: $('#a-contador').checked, prazoReserva: Number($('#a-prazo').value) || 24, pronto: true
   });
   if (!novo.vendedora) return mostrar('Escreva seu nome.');
+  if (novo.link && !/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(novo.link)) return mostrar('Confira o link pra divulgar. Ex.: https://tinyurl.com/rifadageo');
   const wd = soDigitos(novo.whatsapp);
   if (wd.length < 10 || wd.length > 13) return mostrar('Confira seu WhatsApp: coloque o DDD e o número.');
   if (!(novo.preco > 0)) return mostrar('Coloque o valor de cada número.');
