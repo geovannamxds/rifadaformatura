@@ -174,21 +174,23 @@ const ROTULO_PIX = { celular: 'celular', email: 'e-mail', cpf: 'CPF/CNPJ', aleat
 
 /* mensagens de WhatsApp (modelos editáveis no painel, aba Mensagens) */
 const MSGS_PADRAO = {
-  pedido: 'Oi, {vendedora}! Vim pela página da rifa e quero participar 🎉\nNome: {nome}\nNúmeros: {numeros}\nTotal: {total}\nJá te mando o comprovante do Pix aqui.',
+  pedido: 'Oi, {vendedora}! Fiz um pedido na página da rifa 🎉\nPedido: {pedido}\nNome: {nome}\nNúmeros: {numeros}\nTotal: {total}\nSegue o comprovante do Pix.',
+  ganhador: 'Oi, {nome}! 🎉 Seu número {numero} foi sorteado na rifa da formatura e você ganhou: {premio}! Já te passo os próximos passos pra retirar o prêmio com a Formô.',
   bilhete: 'Oi, {nome}! Pagamento confirmado, muito obrigada pela ajuda 💛\nSeus números da rifa: {numeros}\nJá vou te mandar os bilhetes digitais aqui. Guarda eles até o sorteio, tá?\nO sorteio é dia {sorteio}, ao vivo no {instagram}. Boa sorte!',
   cobranca: 'Oi, {nome}! Tudo bem? Separei pra você os números {numeros} da rifa da formatura 😊\nO total ficou {total}. Minha chave Pix é {chave}.\nPra garantir seus números, o pagamento precisa chegar até {prazo}, tá? Depois disso eles voltam a ficar livres.\nQuando pagar, me manda o comprovante aqui. Obrigada!',
   divulgar: 'Gente, tô vendendo a rifa da minha formatura! 🎓\nSão 5 prêmios: {premios}. Cada número custa {preco} e o sorteio é dia {sorteio}.\nEscolhe os seus aqui: {link}\nCada número me ajuda muito, obrigada!',
   divulgarAmigos: 'Tô ajudando a {vendedora} com a rifa da formatura dela! 🎓 São 5 prêmios, incluindo um {premio1}, e cada número custa {preco}.\nEscolhe os seus aqui: {link}'
 };
 const MSGS_INFO = [
-  ['pedido', 'Pedido do comprador', 'O comprador manda pra você quando toca em “Enviar pedido no WhatsApp”.', ['vendedora', 'nome', 'numeros', 'total']],
+  ['pedido', 'Pedido do comprador', 'O comprador manda pra você junto com o comprovante, quando toca em “Já paguei: mandar comprovante”.', ['vendedora', 'pedido', 'nome', 'numeros', 'total']],
   ['bilhete', 'Envio do bilhete', 'Você manda depois de confirmar o pagamento, junto com as imagens dos bilhetes.', ['nome', 'numeros', 'total', 'sorteio', 'instagram']],
   ['cobranca', 'Cobrança', 'Você manda pra quem reservou e ainda não pagou.', ['nome', 'numeros', 'total', 'chave', 'prazo', 'pix']],
   ['divulgar', 'Divulgação (sua)', 'O texto que vai quando você toca em Divulgar.', ['premios', 'premio1', 'preco', 'sorteio', 'link']],
+  ['ganhador', 'Aviso pro ganhador', 'Você manda pra quem tiver um número sorteado (aparece no painel depois que você coloca o resultado em Ajustes).', ['nome', 'numero', 'premio']],
   ['divulgarAmigos', 'Divulgação (dos amigos)', 'O texto que vai quando um comprador toca em “Mandar no WhatsApp” pra te ajudar.', ['vendedora', 'premios', 'premio1', 'preco', 'sorteio', 'link']]
 ];
-const VAR_DESC = { vendedora: 'seu nome', nome: 'nome do comprador', numeros: 'números escolhidos', total: 'valor total', sorteio: 'data do sorteio', instagram: 'Instagram do sorteio', chave: 'sua chave Pix', pix: 'código Pix copia e cola com o valor', prazo: 'até quando a reserva vale', premios: 'os 5 prêmios', premio1: '1º prêmio', preco: 'preço por número', link: 'link da página' };
-function msgModelo(k) { const m = (cfg.msgs || {})[k]; return (typeof m === 'string' && m.trim()) ? m : MSGS_PADRAO[k]; }
+const VAR_DESC = { pedido: 'código do pedido', numero: 'número sorteado', premio: 'prêmio que a pessoa ganhou', vendedora: 'seu nome', nome: 'nome do comprador', numeros: 'números escolhidos', total: 'valor total', sorteio: 'data do sorteio', instagram: 'Instagram do sorteio', chave: 'sua chave Pix', pix: 'código Pix copia e cola com o valor', prazo: 'até quando a reserva vale', premios: 'os 5 prêmios', premio1: '1º prêmio', preco: 'preço por número', link: 'link da página' };
+function msgModelo(k) { const m = (cfg.msgs || {})[k]; if (k === 'pedido' && m === PEDIDO_ANTIGO) return MSGS_PADRAO.pedido; return (typeof m === 'string' && m.trim()) ? m : MSGS_PADRAO[k]; }
 function preencher(tpl, vars) { return String(tpl).replace(/\{(\w+)\}/g, (t, k) => (vars[k] != null ? String(vars[k]) : t)); }
 function listaPremios() { const p = cfg.premios.map((x, i) => i ? x.charAt(0).toLowerCase() + x.slice(1) : x); return p.slice(0, -1).join(', ') + ' e ' + p[p.length - 1]; }
 function varsBase() { return { vendedora: cfg.vendedora, sorteio: dataBR(cfg.sorteio), instagram: cfg.instagram, preco: brl(cfg.preco), premios: listaPremios(), premio1: cfg.premios[0], link: cfg.link || '' }; }
@@ -199,7 +201,12 @@ function varsVenda(nome, nums, completo) {
     chave: cfg.pixChave ? cfg.pixChave + ' (' + ROTULO_PIX[cfg.pixTipo] + ')' : '', pix: pixCopiaECola(total)
   });
 }
-function msgPedido(nome, nums) { return preencher(msgModelo('pedido'), varsVenda(nome, nums, true)); }
+function msgPedido(nome, nums, codigo) {
+  let tpl = msgModelo('pedido');
+  if (!codigo) tpl = tpl.split('\n').filter(l => !l.includes('{pedido}')).join('\n');
+  else if (!tpl.includes('{pedido}')) { const ls = tpl.split('\n'); ls.splice(1, 0, 'Pedido: {pedido}'); tpl = ls.join('\n'); }
+  return preencher(tpl, Object.assign(varsVenda(nome, nums, true), { pedido: codigo || '' }));
+}
 function msgBilhete(v) { return preencher(msgModelo('bilhete'), varsVenda(v.nome, ordenar(v.numeros || []), false)); }
 function msgCobranca(v) { return preencher(msgModelo('cobranca'), Object.assign(varsVenda(v.nome, ordenar(v.numeros || []), false), { prazo: fmtQuando(prazoDe(v).toISOString()) })); }
 function semLinkSeVazio(tpl) { return cfg.link ? tpl : String(tpl).split('\n').filter(l => !l.includes('{link}')).join('\n'); }
@@ -209,6 +216,7 @@ function msgDivulgar(daDona) { return preencher(semLinkSeVazio(msgModelo(daDona 
 function exemploVars(k) {
   const v = varsVenda('Ana Souza', [19203, 19245], k === 'pedido');
   v.prazo = fmtQuando(new Date(Date.now() + (Number(cfg.prazoReserva) || 24) * 3600000).toISOString());
+  v.pedido = 'K7P2'; v.numero = 19203; v.premio = cfg.premios[0];
   return v;
 }
 function htmlMensagens() {
@@ -428,7 +436,7 @@ function renderPublico() {
       '<div class="ferramentas"><form id="f-busca" class="busca" role="search"><label for="busca-num" class="sr">Procurar número</label><input id="busca-num" type="text" inputmode="numeric" autocomplete="off" placeholder="Procurar um número"><button class="btn peq" type="submit">Procurar</button></form>' +
       '<button class="btn peq" type="button" data-acao="sorte">Escolher pra mim</button></div>' +
       '<div id="area-grade"></div>' +
-      '<div class="legenda"><span><i class="amostra"></i>Livre</span><span><i class="amostra sel"></i>Escolhido por você</span><span><i class="amostra ocupado"></i>Já tem dono</span></div>';
+      '<div class="legenda"><span><i class="amostra"></i>Livre</span><span><i class="amostra sel"></i>Escolhido por você</span>' + (TEM_SB && pedidosAtivos().length ? '<span><i class="amostra meu"></i>Reservado pra você</span>' : '') + '<span><i class="amostra ocupado"></i>Já tem dono</span></div>';
   }
   const linhaLivres = aberta
     ? '<p class="dica" id="linha-livres">' + (cfg.mostrarContador ? livres + ' de ' + total + ' números ainda livres. ' : 'Os números riscados já têm dono. ') + (atualizadoPub ? 'Atualizado em ' + fmtQuando(atualizadoPub) + '.' : '') + '</p>'
@@ -447,19 +455,23 @@ function renderPublico() {
       '<p class="lede">' + esc(cfg.subtitulo) + '</p>' +
       '<div class="canhoto"><div><span class="rot">Cada número</span><div class="preco num">' + brl(cfg.preco).replace(',00', '') + '</div></div>' +
         '<div class="canhoto-tx">' + (trechos(UNI).length === 1 ? '<span class="rot">Nº</span><span class="num">' + UNI[0] + ' a ' + UNI[UNI.length - 1] + '</span>' : '<span class="rot">Números</span><span class="num">' + UNI.length + ' à venda</span>') + '</div></div>' +
-      '<div class="pilulas"><span class="pilula mostarda">Sorteio ' + dataBR(cfg.sorteio) + ' · ao vivo no ' + igLink() + '</span>' + pilulaVendas + '</div>' +
+      '<div class="pilulas">' + (temResultado() ? '<a class="pilula mostarda" href="#t-res">🎉 Veja o resultado do sorteio</a>' : '<span class="pilula mostarda">Sorteio ' + dataBR(cfg.sorteio) + ' · ao vivo no ' + igLink() + '</span>' + pilulaVendas) + '</div>' +
       (aberta ? '<div class="hero-cta"><button class="btn primario" type="button" data-acao="ir-escolha">Escolher meus números</button><button class="btn" type="button" data-acao="compartilhar">Compartilhar</button></div>' : '') +
       (esgotado ? '<div class="hero-cta"><span class="pilula mostarda">Esgotou! Muito obrigada 💛🎓</span></div>' : '') +
     '</div></header>' +
-    '<main>' +
+    '<main>' + htmlResultado() +
       '<section class="wrap secao" aria-labelledby="t-premios"><div class="secao-cab"><h2 id="t-premios">Concorra a <em>5 prêmios</em></h2><p class="dica">Cada número sorteado leva um. Arraste pro lado pra ver todos os prêmios desta leva! E fica de olho, que logo vem mais por aí 😉</p></div>' + htmlPremios() + '</section>' +
-      '<section class="wrap secao" id="escolha" aria-labelledby="t-escolha"><div class="secao-cab"><h2 id="t-escolha">Escolha seus <em>números</em></h2>' + linhaLivres + '</div>' + escolha + '</section>' +
+      '<section class="wrap secao" id="escolha" aria-labelledby="t-escolha"><div class="secao-cab"><h2 id="t-escolha">Escolha seus <em>números</em></h2>' + linhaLivres + '</div><div id="meus-pedidos">' + htmlMeusPedidos() + '</div>' + escolha + '</section>' +
       '<section class="banda banda-creme" aria-labelledby="t-como"><canvas class="rabiscos" data-preset="creme" aria-hidden="true"></canvas><div class="wrap secao"><h2 id="t-como">Como comprar</h2><ol class="cartoes">' +
-        '<li><span class="bola">1</span><strong>Escolha os números</strong><span>Toque nos números livres. Pode escolher quantos quiser.</span></li>' +
-        '<li><span class="bola">2</span><strong>Pague por Pix</strong><span>A chave, o código e o QR Code aparecem com o valor certinho quando você tocar em Continuar.</span></li>' +
-        '<li><span class="bola">3</span><strong>Mande o pedido no WhatsApp</strong><span>A mensagem já vai pronta. Manda o comprovante na mesma conversa.</span></li>' +
+        (TEM_SB
+          ? '<li><span class="bola">1</span><strong>Escolha os números</strong><span>Toque nos números livres. Pode escolher até ' + MAX_POR_PEDIDO + ' por pedido.</span></li>' +
+            '<li><span class="bola">2</span><strong>Gere o Pix</strong><span>Coloque seu nome e WhatsApp e toque em Gerar Pix: os números ficam reservados pra você.</span></li>' +
+            '<li><span class="bola">3</span><strong>Pague e mande o comprovante</strong><span>Depois de pagar, toque em “Já paguei”: o WhatsApp abre com o seu pedido pronto.</span></li>'
+          : '<li><span class="bola">1</span><strong>Escolha os números</strong><span>Toque nos números livres. Pode escolher quantos quiser.</span></li>' +
+            '<li><span class="bola">2</span><strong>Pague por Pix</strong><span>A chave, o código e o QR Code aparecem com o valor certinho quando você tocar em Continuar.</span></li>' +
+            '<li><span class="bola">3</span><strong>Mande o pedido no WhatsApp</strong><span>A mensagem já vai pronta. Manda o comprovante na mesma conversa.</span></li>') +
         '<li><span class="bola">4</span><strong>Receba seu bilhete</strong><span>Eu confirmo o pagamento e te mando o bilhete digital de cada número.</span></li>' +
-      '</ol><p class="aviso-reserva">⏳ Depois que você me manda o pedido, eu seguro os números pra você por ' + P + '. Se o pagamento não chegar nesse prazo, eles voltam a ficar livres pra outra pessoa.</p></div></section>' +
+      '</ol><p class="aviso-reserva">⏳ ' + (TEM_SB ? 'Quando você gera o Pix, os números ficam reservados pra você por ' : 'Depois que você me manda o pedido, eu seguro os números pra você por ') + P + '. Se o pagamento não chegar nesse prazo, eles voltam a ficar livres pra outra pessoa.</p></div></section>' +
       '<section class="banda banda-rosa" aria-labelledby="t-ganhou"><canvas class="rabiscos" data-preset="rosa" aria-hidden="true"></canvas><div class="wrap secao"><div class="secao-cab"><h2 id="t-ganhou">Se o seu número sair</h2><p class="lede-g">São 5 números sorteados, um para cada prêmio.</p></div><ol class="passos-g">' +
         '<li><span class="bola">1</span><strong>Eu te aviso</strong><span>Acompanhe a live no ' + igLink() + '. Se um número seu for sorteado, eu te chamo no WhatsApp que você usou na compra.</span></li>' +
         '<li><span class="bola">2</span><strong>Fale com a Formô</strong><span>Com o aviso em mãos, você entra em contato com a Formô pra confirmar o número e combinar a retirada.</span></li>' +
@@ -467,8 +479,8 @@ function renderPublico() {
       '</ol></div></section>' +
       '<section class="wrap secao" aria-labelledby="t-duvidas"><h2 id="t-duvidas">Dúvidas</h2><div class="faq">' +
         '<details><summary>Quando é o sorteio?</summary><p>' + diaSemana(cfg.sorteio).replace(/^./, c => c.toUpperCase()) + ', ' + dataBR(cfg.sorteio) + ', ao vivo no Instagram ' + igLink() + '.</p><p><strong>🚨 Atenção:</strong> as vendas vão até o dia ' + dataBR(cfg.fimVendas) + '.</p></details>' +
-        '<details><summary>Posso comprar mais de um número?</summary><p>Pode sim, quantos quiser! No sorteio saem 5 números, um para cada prêmio. Cada número que você compra é mais uma chance de estar entre eles, então quanto mais números, maiores as suas chances.</p></details>' +
-        '<details><summary>Escolhi meus números. Eles já são meus?</summary><p>Ainda não! Escolher na página não separa nenhum número. Quando você me manda o pedido no WhatsApp, eu reservo os números pra você por ' + P + '. Se o pagamento chegar nesse prazo, eles são seus; se não, voltam a ficar livres pra outra pessoa.</p></details>' +
+        '<details><summary>Posso comprar mais de um número?</summary><p>Pode sim, quantos quiser!' + (TEM_SB ? ' Cada pedido vai até ' + MAX_POR_PEDIDO + ' números; se quiser mais, é só fazer outro pedido.' : '') + ' No sorteio saem 5 números, um para cada prêmio. Cada número que você compra é mais uma chance de estar entre eles, então quanto mais números, maiores as suas chances.</p></details>' +
+        '<details><summary>Escolhi meus números. Eles já são meus?</summary><p>Ainda não! Escolher na página não separa nenhum número. ' + (TEM_SB ? 'Quando você coloca seu nome e WhatsApp e gera o Pix, os números ficam reservados pra você por ' : 'Quando você me manda o pedido no WhatsApp, eu reservo os números pra você por ') + P + '. Se o pagamento chegar nesse prazo, eles são seus; se não, voltam a ficar livres pra outra pessoa.</p></details>' +
         '<details><summary>Meu número está garantido no sorteio?</summary><p>Depois que eu confirmo o seu pagamento, o número é seu. Eu registro cada venda e pago o bloco à Formô na conferência, de ' + esc(cfg.conferencia) + ', e é isso que coloca os números no sorteio.</p></details>' +
         '<details><summary>Vou receber um bilhete de papel?</summary><p>Não, a rifa é 100% digital: cada número é um bilhete em imagem, que chega pelo WhatsApp. Guarde essas imagens até o sorteio. Se quiser, dá pra imprimir.</p></details>' +
         '<details><summary>Quem organiza a rifa?</summary><p>A Formô, empresa que organiza a formatura, e o sorteio é feito por ela. O valor dos números vai para a arrecadação da minha formatura.</p></details>' +
@@ -496,9 +508,9 @@ function celHTML(n, admin, mapa) {
     st = v ? (v.pago ? 'pago' : 'aguardando') : (ui.sel.has(n) ? 'sel' : 'livre');
     if (v) extra = ', ' + (v.pago ? 'pago' : 'aguardando pagamento') + ', ' + (v.nome || '');
   } else {
-    st = ui.sel.has(n) ? 'sel' : (ocupadosPub.has(n) ? 'ocupado' : 'livre');
+    st = ui.sel.has(n) ? 'sel' : (ocupadosPub.has(n) ? ((TEM_SB && pedidoDoNumero(n)) ? 'meu' : 'ocupado') : 'livre');
   }
-  const rot = 'Número ' + n + (st === 'ocupado' ? ', já tem dono' : st === 'sel' ? ', escolhido' : '') + extra;
+  const rot = 'Número ' + n + (st === 'ocupado' ? ', já tem dono' : st === 'meu' ? ', reservado pra você' : st === 'sel' ? ', escolhido' : '') + extra;
   return '<button type="button" class="cel ' + st + (ui.destaque === n ? ' pisca' : '') + '" data-n="' + n + '" aria-pressed="' + (st === 'sel') + '" aria-label="' + esc(rot) + '"' + (st === 'ocupado' ? ' aria-disabled="true"' : '') + '>' + n + '</button>';
 }
 function renderGrade(admin) {
@@ -575,7 +587,7 @@ function cabFolha(titulo) {
 }
 
 /* pedido do comprador */
-function abrirPedido() {
+function abrirPedidoWhats() {
   const nums = ordenar(ui.sel);
   if (!nums.length) return;
   const total = nums.length * cfg.preco;
@@ -647,11 +659,13 @@ function renderAdmin() {
 }
 function renderAvisos() {
   const el = $('#avisos'); if (!el) return;
-  let h = '';
+  let h = htmlAvisoGanhadores();
   if (!cfg.pronto) h += '<div class="aviso alerta"><div><strong>Falta pouco pra abrir as vendas.</strong><p>Preencha seu WhatsApp e o Pix em Ajustes, confira seus números e salve. Até lá, quem abre o link vê os prêmios e um aviso de “em breve”.</p></div></div>';
   if (erroVendas) h += '<div class="aviso alerta"><p>' + esc(erroVendas) + '</p></div>';
   const nVenc = vendasCarregadas ? vendas.filter(vencida).length : 0;
   if (nVenc) h += '<div class="aviso alerta"><div><strong>' + nVenc + ' ' + plural(nVenc, 'reserva passou', 'reservas passaram') + ' do prazo de ' + esc(prazoTexto()) + ' sem pagamento.</strong><p>' + (TEM_SB ? 'Os números já aparecem livres pros compradores e saem da venda sozinhos em alguns minutos.' : 'Cobre de novo ou libere os números pra outras pessoas.') + '</p></div><button class="btn peq" type="button" data-acao="ver-vencidas">Ver ' + plural(nVenc, 'reserva', 'reservas') + '</button></div>';
+  const nLogo = vendasCarregadas ? vendas.filter(venceLogo).length : 0;
+  if (nLogo) h += '<div class="aviso alerta"><div><strong>⏰ ' + nLogo + ' ' + plural(nLogo, 'reserva vence', 'reservas vencem') + ' nas próximas 3 horas.</strong><p>Cobre agora no WhatsApp pra não perder a venda.</p></div><button class="btn peq" type="button" data-acao="ver-vencendo">Ver ' + plural(nLogo, 'reserva', 'reservas') + '</button></div>';
   const nLib = vendasCarregadas ? vendas.filter(v => liberada(v) && Date.now() - Date.parse(v.liberadaEm) < 86400000).length : 0;
   if (nLib) h += '<div class="aviso"><div><strong>' + nLib + ' ' + plural(nLib, 'reserva foi liberada', 'reservas foram liberadas') + ' nas últimas 24 horas.</strong><p>O pagamento não chegou no prazo, então os números voltaram a ficar livres. Se alguém pagou atrasado, toque em “Recebi o pagamento” na venda.</p></div><button class="btn peq" type="button" data-acao="ver-liberadas">Ver ' + plural(nLib, 'liberada', 'liberadas') + '</button></div>';
   const p = pendentes();
@@ -688,7 +702,7 @@ function renderAba() {
       '<div class="lista-topo"><button class="btn primario" type="button" data-acao="nova-venda">Nova venda</button>' +
       '<div class="busca-v"><label for="busca-venda" class="sr">Buscar venda</label><input id="busca-venda" type="search" placeholder="Buscar por nome ou número" value="' + esc(ui.busca) + '"></div></div>' +
       '<div class="filtros" id="filtros"></div><div id="lista" class="lista"></div>' +
-      '<div class="export"><button class="btn peq" type="button" data-acao="csv">Baixar cópia da planilha (.csv)</button><p class="dica">Uma linha por número, como a lista de controle da Formô. Abre no Excel e no Google Planilhas.</p></div>';
+      '<div class="export"><div class="linha-botoes"><button class="btn peq" type="button" data-acao="imprimir-lista">Imprimir lista de controle</button><button class="btn peq" type="button" data-acao="csv">Baixar planilha (.csv)</button></div><p class="dica">A lista de controle sai no modelo da Formô, uma página por bloco, pronta pra imprimir ou salvar em PDF. A planilha abre no Excel e no Google Planilhas.</p></div>';
     $('#busca-venda').addEventListener('input', e => { ui.busca = e.target.value; renderLista(); });
     renderLista();
   } else if (ui.aba === 'numeros') {
@@ -707,8 +721,8 @@ function renderAba() {
 function renderLista() {
   const el = $('#lista'); if (!el) return;
   const fl = $('#filtros');
-  const nLiberadas = vendas.filter(liberada).length, aReceber = vendas.filter(v => !v.pago && !liberada(v)).length, semBilhete = vendas.filter(v => v.pago && !v.bilhete).length, nVenc = vendas.filter(vencida).length;
-  if (fl) fl.innerHTML = [['todas', 'Todas', vendas.length], ['receber', 'A receber', aReceber], ['vencidas', 'Reserva vencida', nVenc], ['bilhete', 'Bilhete a enviar', semBilhete], ['liberadas', 'Liberadas', nLiberadas]].filter(f => (f[0] !== 'vencidas' && f[0] !== 'liberadas') || f[2] || ui.filtro === f[0])
+  const nLiberadas = vendas.filter(liberada).length, nLogo = vendas.filter(venceLogo).length, aReceber = vendas.filter(v => !v.pago && !liberada(v)).length, semBilhete = vendas.filter(v => v.pago && !v.bilhete).length, nVenc = vendas.filter(vencida).length;
+  if (fl) fl.innerHTML = [['todas', 'Todas', vendas.length], ['receber', 'A receber', aReceber], ['vencendo', 'Vencendo', nLogo], ['vencidas', 'Reserva vencida', nVenc], ['bilhete', 'Bilhete a enviar', semBilhete], ['liberadas', 'Liberadas', nLiberadas]].filter(f => (f[0] !== 'vencidas' && f[0] !== 'liberadas' && f[0] !== 'vencendo') || f[2] || ui.filtro === f[0])
     .map(f => '<button type="button" class="filtro" data-filtro="' + f[0] + '" aria-pressed="' + (ui.filtro === f[0]) + '">' + f[1] + ' (' + f[2] + ')</button>').join('');
   if (!vendasCarregadas) { el.innerHTML = erroVendas ? '' : '<p class="dica">Carregando…</p>'; return; }
   if (!vendas.length) {
@@ -717,8 +731,8 @@ function renderLista() {
   }
   const q = ui.busca.trim().toLowerCase();
   const arr = vendas.slice()
-    .filter(v => ui.filtro === 'todas' || (ui.filtro === 'receber' ? (!v.pago && !liberada(v)) : ui.filtro === 'vencidas' ? vencida(v) : ui.filtro === 'liberadas' ? liberada(v) : (v.pago && !v.bilhete)))
-    .filter(v => !q || String(v.nome || '').toLowerCase().includes(q) || (v.numeros || []).concat(v.numerosLiberados || []).some(n => String(n).includes(q)) || soDigitos(v.telefone).includes(soDigitos(q) || '§'))
+    .filter(v => ui.filtro === 'todas' || (ui.filtro === 'receber' ? (!v.pago && !liberada(v)) : ui.filtro === 'vencidas' ? vencida(v) : ui.filtro === 'vencendo' ? venceLogo(v) : ui.filtro === 'liberadas' ? liberada(v) : (v.pago && !v.bilhete)))
+    .filter(v => !q || String(v.nome || '').toLowerCase().includes(q) || String(v.codigo || '').toLowerCase() === q.replace(/^#/, '') || (v.numeros || []).concat(v.numerosLiberados || []).some(n => String(n).includes(q)) || soDigitos(v.telefone).includes(soDigitos(q) || '§'))
     .sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')));
   el.innerHTML = arr.length ? arr.map(cardVenda).join('') : '<p class="dica">Nenhuma venda encontrada.</p>';
 }
@@ -726,7 +740,7 @@ function cardLiberada(v) {
   const nums = ordenar(v.numerosLiberados || []);
   return '<article class="venda liberada">' +
     '<div class="venda-topo"><span class="pill liberada">Reserva liberada</span><span class="num">' + brl(nums.length * cfg.preco) + '</span></div>' +
-    '<div><h3 class="venda-nome">' + esc(v.nome || 'Sem nome') + '</h3>' + (v.telefone ? '<span class="dica">' + esc(foneBonito(v.telefone)) + '</span>' : '') + '</div>' +
+    '<div><h3 class="venda-nome">' + esc(v.nome || 'Sem nome') + '</h3>' + (v.telefone ? '<span class="dica">' + esc(foneBonito(v.telefone)) + '</span>' : '') + (v.codigo ? '<span class="dica cod-pedido">Pedido ' + esc(v.codigo) + (v.origem === 'site' ? ' · feito pelo site' : '') + '</span>' : '') + '</div>' +
     '<div class="chips">' + nums.map(n => '<span class="chip-num riscado">' + n + '</span>').join('') + '</div>' +
     '<p class="dica">Reservou em ' + fmtQuando(v.criadoEm) + ' · liberada em ' + fmtQuando(v.liberadaEm) + ', porque o pagamento não chegou no prazo.</p>' +
     (v.obs ? '<p class="dica">' + esc(v.obs) + '</p>' : '') +
@@ -763,8 +777,8 @@ function cardVenda(v) {
   }
   acoes += '<button class="btn peq fantasma" type="button" data-acao="editar-venda" data-venda="' + esc(v.id) + '">Editar</button>';
   return '<article class="venda">' +
-    '<div class="venda-topo"><span class="pill ' + (v.pago ? 'pago' : (venc ? 'vencida' : 'aguardando')) + '">' + (v.pago ? 'Pago' : (venc ? 'Reserva vencida' : 'Aguardando pagamento')) + '</span><span class="num">' + brl(nums.length * cfg.preco) + '</span></div>' +
-    '<div><h3 class="venda-nome">' + esc(v.nome || 'Sem nome') + '</h3>' + (v.telefone ? '<span class="dica">' + esc(foneBonito(v.telefone)) + '</span>' : '') + '</div>' +
+    '<div class="venda-topo"><span class="pill ' + (v.pago ? 'pago' : (venc ? 'vencida' : (venceLogo(v) ? 'vencendo' : 'aguardando'))) + '">' + (v.pago ? 'Pago' : (venc ? 'Reserva vencida' : (venceLogo(v) ? '⏰ Vence em ' + faltaTexto(v) : 'Aguardando pagamento'))) + '</span><span class="num">' + brl(nums.length * cfg.preco) + '</span></div>' +
+    '<div><h3 class="venda-nome">' + esc(v.nome || 'Sem nome') + '</h3>' + (v.telefone ? '<span class="dica">' + esc(foneBonito(v.telefone)) + '</span>' : '') + (v.codigo ? '<span class="dica cod-pedido">Pedido ' + esc(v.codigo) + (v.origem === 'site' ? ' · feito pelo site' : '') + '</span>' : '') + '</div>' +
     '<div class="chips">' + nums.map(n => '<span class="chip-num">' + n + '</span>').join('') + '</div>' +
     (v.pago ? '<p class="dica">' + (v.bilhete ? 'Bilhete enviado' : 'Bilhete ainda não enviado') + '</p>' : '<p class="dica' + (venc ? ' erro' : '') + '">Reservado em ' + fmtQuando(v.criadoEm) + ' · ' + (venc ? 'o prazo acabou em ' : 'pagar até ') + fmtQuando(prazoDe(v).toISOString()) + '</p>') +
     (v.obs ? '<p class="dica">' + esc(v.obs) + '</p>' : '') +
@@ -827,6 +841,9 @@ function abrirVenda(v, numsIniciais) {
   atualizarInfo();
   const colar = $('#v-colar');
   if (colar) colar.addEventListener('input', () => {
+    const mc = colar.value.match(/pedido\s*:\s*#?([A-Za-z2-9]{4})\b/i);
+    const ja = mc && vendas.find(x => String(x.codigo || '').toUpperCase() === mc[1].toUpperCase());
+    if (ja) { abrirVenda(ja); toast('Esse pedido já está no painel: é a venda de ' + (primeiroNome(ja.nome) || 'alguém') + '.'); return; }
     const p = lerPedido(colar.value);
     if (p.numeros.length) inNum.value = p.numeros.join(', ');
     if (p.nome) $('#v-nome').value = p.nome;
@@ -917,6 +934,9 @@ function htmlAjustes() {
       '<div class="campo"><label for="a-prazo">Prazo pra pagar uma reserva</label><select id="a-prazo">' + [12, 24, 48, 72].map(h => '<option value="' + h + '"' + (Number(cfg.prazoReserva || 24) === h ? ' selected' : '') + '>' + (h >= 48 ? (h / 24) + ' dias' : h + ' horas') + '</option>').join('') + '</select><p class="dica">' + (TEM_SB ? 'Depois desse prazo sem pagamento, os números voltam a ficar livres sozinhos. A venda vai pro filtro “Liberadas”, caso a pessoa pague depois.' : 'Depois desse prazo sem pagamento, a venda aparece como “Reserva vencida” pra você cobrar ou liberar os números.') + '</p></div>' +
       '<label class="opcao" for="a-contador"><input id="a-contador" type="checkbox"' + (cfg.mostrarContador ? ' checked' : '') + '><span>Mostrar quantos números ainda estão livres</span></label>' +
     '</fieldset>' +
+    '<fieldset><legend>Resultado do sorteio</legend><p class="dica">Depois da live, coloque o número sorteado de cada prêmio e salve. A página passa a mostrar o resultado, e aqui no painel aparece quem ganhou com um número seu.</p>' +
+      cfg.premios.map((pr, i) => '<div class="campo"><label for="a-res-' + i + '">' + (i + 1) + 'º prêmio · ' + esc(pr) + '</label><input id="a-res-' + i + '" type="text" inputmode="numeric" autocomplete="off" placeholder="Número sorteado" value="' + (numeroSorteado(i) || '') + '"></div>').join('') +
+    '</fieldset>' +
     '<p class="erro" id="a-erro" hidden></p>' +
     '<button class="btn primario largo" type="submit" id="a-salvar">' + (cfg.pronto ? 'Salvar e atualizar a página' : 'Salvar e abrir as vendas') + '</button>' +
   '</form>';
@@ -952,10 +972,12 @@ async function salvarAjustes() {
     pixTipo: $('#a-pix-tipo').value, pixChave: $('#a-pix-chave').value.trim(), pixNome: $('#a-pix-nome').value.trim(), pixCidade: $('#a-pix-cidade').value.trim(),
     preco: lerPreco($('#a-preco').value), faixas: $('#a-faixas').value.trim(),
     titulo: $('#a-titulo').value.trim() || CFG_PADRAO.titulo,
+    resultado: cfg.premios.map((pr, i) => { const d = soDigitos(($('#a-res-' + i) || {}).value); return d ? Number(d) : null; }),
     link: (() => { const l = (($('#a-link') || {}).value || '').trim().replace(/\s+/g, ''); return l && !/^https?:\/\//i.test(l) ? 'https://' + l : l; })(),
     mostrarContador: $('#a-contador').checked, prazoReserva: Number($('#a-prazo').value) || 24, pronto: true
   });
   if (!novo.vendedora) return mostrar('Escreva seu nome.');
+  if ((novo.resultado || []).some(n => n && (n < 100 || n > 9999999))) return mostrar('Confira os números sorteados: cada um tem de 3 a 7 algarismos.');
   if (novo.link && !/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(novo.link)) return mostrar('Confira o link pra divulgar. Ex.: https://tinyurl.com/rifadageo');
   const wd = soDigitos(novo.whatsapp);
   if (wd.length < 10 || wd.length > 13) return mostrar('Confira seu WhatsApp: coloque o DDD e o número.');
@@ -1081,6 +1103,11 @@ document.addEventListener('click', e => {
       if (!vendasCarregadas) { toast('Espere suas vendas carregarem.'); break; }
       publicar(null, 'Página dos compradores atualizada'); break;
     case 'csv': baixarCSV(); break;
+    case 'imprimir-lista': imprimirLista(); break;
+    case 'ver-pedido': verPedido(t.dataset.codigo); break;
+    case 'mandou-comprovante': marcarPedidoLocal(t.dataset.codigo, { enviado: true }); renderMeusPedidos(); break;
+    case 'pedido-whats': ui.pedidoPeloWhats = true; abrirPedidoWhats(); break;
+    case 'ver-vencendo': ui.aba = 'vendas'; ui.filtro = 'vencendo'; renderAba(); { const l = $('#lista'); if (l) l.scrollIntoView({ block: 'start' }); } break;
     case 'sair': sair(); break;
     case 'recarregar': location.reload(); break;
     case 'liberar': { const v = vendas.find(x => x.id === id); if (v) { abrirVenda(v); ui.confirmarExclusao = true; renderZonaExcluir(); const z = $('#zona-excluir'); if (z) z.scrollIntoView({ block: 'center' }); } break; }
@@ -1113,13 +1140,17 @@ function tocarNumero(n) {
     const v = mapaVendas().get(n);
     if (v) { abrirVenda(v); return; }
   } else {
+    const meu = TEM_SB ? pedidoDoNumero(n) : null;
+    if (meu) { toast('O ' + n + ' está reservado pra você (pedido ' + meu.codigo + ').'); return; }
     if (ocupadosPub.has(n)) { toast('O ' + n + ' já tem dono. Escolha outro.'); return; }
     if (!cfg.pronto || vendasEncerradas()) return;
+    if (TEM_SB && !ui.sel.has(n) && ui.sel.size >= MAX_POR_PEDIDO) { toast('Cada pedido vai até ' + MAX_POR_PEDIDO + ' números. Finalize este e faça outro depois.'); return; }
   }
   if (ui.sel.has(n)) ui.sel.delete(n); else ui.sel.add(n);
   atualizarCel(n); renderBarra();
 }
 function escolherPraMim() {
+  if (ui.modo !== 'admin' && TEM_SB && ui.sel.size >= MAX_POR_PEDIDO) { toast('Cada pedido vai até ' + MAX_POR_PEDIDO + ' números. Finalize este e faça outro depois.'); return; }
   const livres = UNI.filter(n => !estaOcupado(n) && !ui.sel.has(n));
   if (!livres.length) { toast('Não sobrou número livre.'); return; }
   const n = livres[Math.floor(Math.random() * livres.length)];
@@ -1190,7 +1221,7 @@ if (TEM_SB && PAGINA !== 'admin') {
    Versão do site (GitHub Pages) com banco de dados no Supabase
    ===================================================================== */
 const SB_TABELA = 'vendas';
-const CAMPOS_VENDA = { nome: 'nome', telefone: 'telefone', numeros: 'numeros', pago: 'pago', bilhete: 'bilhete', obs: 'obs', criadoEm: 'criado_em', atualizadoEm: 'atualizado_em', pagoEm: 'pago_em', liberadaEm: 'liberada_em', numerosLiberados: 'numeros_liberados' };
+const CAMPOS_VENDA = { nome: 'nome', telefone: 'telefone', numeros: 'numeros', pago: 'pago', bilhete: 'bilhete', obs: 'obs', criadoEm: 'criado_em', atualizadoEm: 'atualizado_em', pagoEm: 'pago_em', liberadaEm: 'liberada_em', numerosLiberados: 'numeros_liberados', codigo: 'codigo', origem: 'origem' };
 function paraLinha(d) {
   const r = {};
   Object.keys(CAMPOS_VENDA).forEach(k => { if (k in d) r[CAMPOS_VENDA[k]] = d[k]; });
@@ -1433,6 +1464,243 @@ function aplicarEstado(e) {
     toast(plural(perdidos.length, 'O ', 'Os ') + listaNums(perdidos) + plural(perdidos.length, ' acabou de ser vendido. Escolha outro.', ' acabaram de ser vendidos. Escolha outros.'));
     if (ui.folha === 'pedido') { if (ui.sel.size) abrirPedido(); else fecharFolha(); }
   }
+}
+
+
+/* =====================================================================
+   Pedido em duas etapas: dados → Pix reservado → comprovante no WhatsApp
+   ===================================================================== */
+const MAX_POR_PEDIDO = 20;
+const PEDIDO_ANTIGO = 'Oi, {vendedora}! Vim pela página da rifa e quero participar 🎉\nNome: {nome}\nNúmeros: {numeros}\nTotal: {total}\nJá te mando o comprovante do Pix aqui.';
+
+/* pedidos deste aparelho (só pra mostrar de novo o Pix e o botão do comprovante) */
+function lerPedidosLocais() {
+  try { const a = JSON.parse(localStorage.getItem('rifa-pedidos') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+function gravarPedidosLocais(lista) {
+  try { localStorage.setItem('rifa-pedidos', JSON.stringify(lista.slice(-6))); } catch (e) { /* sem armazenamento */ }
+}
+function pedidosAtivos() {
+  const agora = Date.now();
+  return lerPedidosLocais().filter(p => p && p.codigo && Date.parse(p.prazo) > agora);
+}
+function salvarPedidoLocal(p) {
+  const lista = lerPedidosLocais().filter(x => x && x.codigo !== p.codigo && Date.parse(x.prazo) > Date.now() - 7 * 86400000);
+  lista.push(p); gravarPedidosLocais(lista);
+}
+function marcarPedidoLocal(codigo, campos) {
+  gravarPedidosLocais(lerPedidosLocais().map(p => (p && p.codigo === codigo) ? Object.assign({}, p, campos) : p));
+}
+function pedidoDoNumero(n) {
+  return pedidosAtivos().find(p => (p.numeros || []).map(Number).includes(Number(n)) && ocupadosPub.has(Number(n))) || null;
+}
+function htmlMeusPedidos() {
+  if (!TEM_SB) return '';
+  const ps = pedidosAtivos();
+  if (!ps.length) return '';
+  return '<div class="meus-pedidos">' + ps.map(p =>
+    '<div class="meu-pedido"><div><strong>Seu pedido ' + esc(p.codigo) + '</strong> · ' + esc(listaNums(p.numeros || [])) + ' · <span class="num">' + brl((p.numeros || []).length * cfg.preco) + '</span>' +
+      '<br><span class="dica">' + (p.enviado ? 'Comprovante enviado. Assim que eu confirmar, te mando o bilhete 💛' : 'Reservado até ' + fmtQuando(p.prazo) + '. Falta pagar e me mandar o comprovante.') + '</span></div>' +
+      '<button class="btn peq' + (p.enviado ? '' : ' primario') + '" type="button" data-acao="ver-pedido" data-codigo="' + esc(p.codigo) + '">' + (p.enviado ? 'Ver pedido' : 'Pagar') + '</button></div>'
+  ).join('') + '</div>';
+}
+function renderMeusPedidos() { const el = $('#meus-pedidos'); if (el) el.innerHTML = htmlMeusPedidos(); }
+
+function abrirPedido() {
+  if (TEM_SB && !ui.pedidoPeloWhats) abrirCheckout(); else abrirPedidoWhats();
+}
+function htmlChipsPedido(nums, removivel) {
+  return '<div class="chips">' + nums.map(n => '<span class="chip-num">' + n + (removivel ? '<button type="button" data-acao="tirar" data-num="' + n + '" aria-label="Tirar o ' + n + '">×</button>' : '') + '</span>').join('') + '</div>' +
+    '<p class="total-linha"><span>' + nums.length + ' × ' + brl(cfg.preco) + '</span><span class="num">' + brl(nums.length * cfg.preco) + '</span></p>';
+}
+function htmlEtapas(atual) {
+  return '<ol class="etapas" aria-label="Etapas do pedido"><li' + (atual === 1 ? ' aria-current="step"' : ' class="feita"') + '><span>1</span>Seus dados</li><li' + (atual === 2 ? ' aria-current="step"' : '') + '><span>2</span>Pix e comprovante</li></ol>';
+}
+function abrirCheckout(erroMsg, comAlternativa) {
+  const nums = ordenar(ui.sel);
+  if (!nums.length) { fecharFolha(); return; }
+  abrirFolha('pedido',
+    '<div class="folha-cab">' + cabFolha('Seu pedido') + htmlChipsPedido(nums, true) + '</div><div class="perfura" aria-hidden="true"></div>' +
+    '<form class="folha-corpo" id="f-checkout" novalidate>' + htmlEtapas(1) +
+      '<div class="campo"><label for="p-nome">Seu nome</label><input id="p-nome" type="text" autocomplete="name" placeholder="Nome e sobrenome" value="' + esc(ui.nomeComprador || '') + '"></div>' +
+      '<div class="campo"><label for="p-fone">Seu WhatsApp, com DDD</label><input id="p-fone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(41) 99999-0000" value="' + esc(ui.foneComprador || '') + '"><p class="dica">É por ele que eu confirmo o pagamento e te mando o bilhete.</p></div>' +
+      '<p class="erro" id="p-erro" role="alert"' + (erroMsg ? '' : ' hidden') + '>' + esc(erroMsg || '') + '</p>' +
+      (comAlternativa ? '<p class="dica">Se continuar sem funcionar, <button class="link" type="button" data-acao="pedido-whats">mande o pedido direto no meu WhatsApp</button>.</p>' : '') +
+      '<button class="btn primario largo" type="submit" id="p-reservar">Gerar Pix e reservar</button>' +
+      '<p class="nota">⏳ Quando você gera o Pix, os números ficam reservados pra você por ' + esc(prazoTexto()) + '. Se o pagamento não chegar nesse prazo, eles voltam a ficar livres.</p>' +
+      '<p class="dica lgpd">🔒 Seu nome e seu WhatsApp ficam só comigo, pra confirmar a compra e te mandar o bilhete.</p>' +
+    '</form>');
+  const nome = $('#p-nome'), fone = $('#p-fone');
+  nome.addEventListener('input', () => { ui.nomeComprador = nome.value; });
+  fone.addEventListener('input', () => { ui.foneComprador = fone.value; });
+  $('#f-checkout').addEventListener('submit', e => { e.preventDefault(); enviarReserva(); });
+}
+function erroCheckout(msg) { const e = $('#p-erro'); if (e) { e.textContent = msg; e.hidden = !msg; } }
+async function enviarReserva() {
+  const nums = ordenar(ui.sel);
+  const nome = ($('#p-nome').value || '').trim().replace(/\s+/g, ' ');
+  let fone = soDigitos($('#p-fone').value);
+  if (nome.length < 2) { erroCheckout('Escreva seu nome pra eu saber de quem é o pedido.'); $('#p-nome').focus(); return; }
+  if (/^55\d{10,11}$/.test(fone)) fone = fone.slice(2);
+  if (!/^\d{10,11}$/.test(fone)) { erroCheckout('Confira seu WhatsApp: coloque o DDD e o número, como (41) 99999-0000.'); $('#p-fone').focus(); return; }
+  if (nums.length > MAX_POR_PEDIDO) { erroCheckout('Cada pedido vai até ' + MAX_POR_PEDIDO + ' números. Tire alguns e faça outro pedido depois.'); return; }
+  erroCheckout('');
+  const b = $('#p-reservar'); b.disabled = true; b.textContent = 'Reservando…';
+  let r = null, corpo = null;
+  try {
+    r = await fetch(SB_CFG.url.replace(/\/+$/, '') + '/rest/v1/rpc/reservar', {
+      method: 'POST', cache: 'no-store',
+      headers: { apikey: SB_CFG.chave, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ p_nome: nome, p_telefone: fone, p_numeros: nums })
+    });
+    corpo = await r.json().catch(() => null);
+  } catch (e) { r = null; }
+  if (!r || !r.ok || !corpo || !corpo.codigo) {
+    tratarErroReserva(r ? String((corpo && corpo.message) || '') : 'rede');
+    return;
+  }
+  const pedido = { codigo: corpo.codigo, numeros: (corpo.numeros || nums).map(Number), prazo: corpo.prazo, nome, fone, criado: new Date().toISOString(), enviado: false };
+  salvarPedidoLocal(pedido);
+  pedido.numeros.forEach(n => ocupadosPub.add(n));
+  ui.sel.clear();
+  if (ui.modo === 'publico') { renderGrade(false); renderMeusPedidos(); const l = $('#linha-livres'); if (l) l.textContent = textoLivres(); }
+  abrirPagamento(pedido);
+  buscarEstadoSB();
+}
+function tratarErroReserva(msg) {
+  const reabrir = (m, alt) => { if (ui.sel.size) abrirCheckout(m, alt); else { fecharFolha(); toast(m); } };
+  if (msg.indexOf('numero_ocupado') === 0) {
+    const tomados = (msg.split(':')[1] || '').split(',').map(Number).filter(Boolean);
+    tomados.forEach(n => { ui.sel.delete(n); ocupadosPub.add(n); });
+    if (ui.modo === 'publico') renderGrade(false);
+    reabrir(plural(tomados.length, 'O ', 'Os ') + listaNums(tomados) + plural(tomados.length, ' acabou de ser reservado por outra pessoa e saiu do seu pedido.', ' acabaram de ser reservados por outra pessoa e saíram do seu pedido.') + (ui.sel.size ? ' Confira e toque em Gerar Pix de novo.' : ' Escolha outros números.'));
+    buscarEstadoSB();
+    return;
+  }
+  const T = {
+    limite_whatsapp: 'Esse WhatsApp já tem 2 pedidos esperando pagamento. Pague um deles ou fale comigo no WhatsApp.',
+    limite_conexao: 'Já tem vários pedidos esperando pagamento feitos daqui. Pague um deles ou fale comigo no WhatsApp.',
+    muitos_pedidos: 'Muita gente fazendo pedido agora! Tente de novo daqui a alguns minutos.',
+    muitos_numeros: 'Cada pedido vai até ' + MAX_POR_PEDIDO + ' números. Tire alguns e faça outro pedido depois.',
+    numero_fora: 'Algum desses números não está mais à venda. Recarregue a página e escolha de novo.',
+    vendas_fechadas: 'As vendas estão fechadas no momento.',
+    nome_invalido: 'Escreva seu nome pra eu saber de quem é o pedido.',
+    telefone_invalido: 'Confira seu WhatsApp: coloque o DDD e o número, como (41) 99999-0000.',
+    sem_numeros: 'Escolha pelo menos um número.'
+  };
+  const chave = Object.keys(T).find(k => msg.indexOf(k) === 0);
+  if (chave) { reabrir(T[chave], chave === 'limite_whatsapp' || chave === 'limite_conexao' || chave === 'muitos_pedidos'); return; }
+  reabrir(msg === 'rede' ? 'Não consegui falar com o sistema agora. Confira a internet e tente de novo.' : 'Não consegui reservar agora. Tente de novo em instantes.', true);
+}
+function htmlPixPedido(total, rotuloId) {
+  if (!cfg.pixChave) return '';
+  const cc = pixCopiaECola(total);
+  return '<li><h3>Pague por Pix</h3>' +
+    '<p class="dica">Chave Pix (' + ROTULO_PIX[cfg.pixTipo] + ')' + (cfg.pixNome ? ' · em nome de ' + esc(cfg.pixNome) : '') + '</p>' +
+    '<div class="copia"><code>' + esc(cfg.pixChave) + '</code><button class="btn peq" type="button" data-copiar="' + esc(cfg.pixChave) + '">Copiar chave</button></div>' +
+    (cc ? '<p class="dica">Ou use o Pix copia e cola, que já vem com o valor de ' + brl(total) + ':</p><div class="copia-cc"><textarea id="' + rotuloId + '" class="cc-campo" readonly rows="4" aria-label="Código Pix copia e cola">' + esc(cc) + '</textarea><button class="btn peq" type="button" data-copiar="' + esc(cc) + '" data-alvo="' + rotuloId + '">Copiar código</button></div>' : '') +
+    (cc && qrSVG(cc) ? '<div class="qr-pix">' + qrSVG(cc, 'QR Code Pix de ' + brl(total)) + '<p>Tá no computador ou no celular de outra pessoa? Escaneie com o app do banco.</p></div>' : '') +
+  '</li>';
+}
+function abrirPagamento(p) {
+  const nums = ordenar(p.numeros || []);
+  const total = nums.length * cfg.preco;
+  abrirFolha('pagamento',
+    '<div class="folha-cab">' + cabFolha('Pedido ' + esc(p.codigo)) +
+      '<p class="reservado">✅ Números reservados pra você até <strong>' + fmtQuando(p.prazo) + '</strong></p>' + htmlChipsPedido(nums, false) +
+    '</div><div class="perfura" aria-hidden="true"></div>' +
+    '<div class="folha-corpo">' + htmlEtapas(2) +
+      '<ol class="passos">' + htmlPixPedido(total, 'pix-cc-pedido') +
+        '<li><h3>Me mande o comprovante</h3><p>Depois de pagar, toque no botão: o WhatsApp abre com o seu pedido pronto. É só anexar o comprovante do Pix.</p>' +
+          '<a class="btn primario largo" id="p-comprovante" href="' + esc(linkWa(cfg.whatsapp, msgPedido(p.nome, nums, p.codigo))) + '" target="_blank" rel="noopener" data-acao="mandou-comprovante" data-codigo="' + esc(p.codigo) + '">Já paguei: mandar comprovante</a>' +
+          '<p class="dica">Se o WhatsApp não abrir, mande o comprovante pro número <span class="num">' + esc(foneBonito(cfg.whatsapp)) + '</span> com o código <strong>' + esc(p.codigo) + '</strong> · <button class="link" type="button" data-copiar="' + esc(soDigitos(cfg.whatsapp)) + '">copiar número</button></p></li>' +
+      '</ol>' +
+      '<p class="nota">Assim que eu confirmar o pagamento, te mando o bilhete digital de cada número pelo WhatsApp. Se fechar esta janela, o pedido continua aqui na página, no aviso “Seu pedido”. 💛</p>' +
+    '</div>');
+}
+function verPedido(codigo) {
+  const p = lerPedidosLocais().find(x => x && x.codigo === codigo);
+  if (p) abrirPagamento(p);
+}
+
+/* =====================================================================
+   Reservas quase vencendo (painel)
+   ===================================================================== */
+function venceLogo(v) {
+  if (v.pago || liberada(v) || vencida(v) || !(v.numeros || []).length) return false;
+  return prazoDe(v).getTime() - Date.now() <= 3 * 3600000;
+}
+function faltaTexto(v) {
+  const m = Math.max(1, Math.round((prazoDe(v).getTime() - Date.now()) / 60000));
+  if (m < 60) return m + ' min';
+  const h = Math.floor(m / 60), r = m % 60;
+  return h + 'h' + (r ? String(r).padStart(2, '0') : '');
+}
+
+/* =====================================================================
+   Resultado do sorteio
+   ===================================================================== */
+function numeroSorteado(i) { const n = Number(((cfg.resultado || [])[i]) || 0); return n > 0 ? n : 0; }
+function temResultado() { return Array.isArray(cfg.resultado) && cfg.resultado.some(n => Number(n) > 0); }
+function htmlResultado() {
+  if (!temResultado()) return '';
+  const meus = [];
+  const itens = cfg.premios.map((p, i) => {
+    const n = numeroSorteado(i), meu = n && UNI_SET.has(n);
+    if (meu) meus.push(n);
+    return '<li class="res-item' + (meu ? ' meu' : '') + '" style="--cor:' + (CORES_PREMIO[i] || CORES_PREMIO[0]) + '"><span class="res-pos">' + (i + 1) + 'º</span><span class="res-premio">' + esc(p) + '</span><span class="res-num num">' + (n || 'a definir') + '</span>' + (meu ? '<span class="res-selo">Número meu! 🎉</span>' : '') + '</li>';
+  }).join('');
+  const texto = meus.length
+    ? '🎉 Saiu número meu! Se você comprou ' + plural(meus.length, 'o número ', 'os números ') + listaNums(meus) + ', eu vou te chamar no WhatsApp que você usou na compra pra combinar a retirada com a Formô.'
+    : 'Desta vez nenhum dos números sorteados era dos meus. Muito obrigada a todo mundo que participou e me ajudou a chegar na formatura! 💛';
+  return '<section class="wrap secao resultado" aria-labelledby="t-res"><div class="secao-cab"><h2 id="t-res">Resultado do <em>sorteio</em></h2><p class="dica">Sorteio ao vivo no ' + igLink() + ' em ' + dataBR(cfg.sorteio) + '.</p></div>' +
+    '<ol class="res-lista">' + itens + '</ol><p class="res-texto">' + texto + '</p></section>';
+}
+function msgGanhador(v, n, premio) {
+  return preencher(msgModelo('ganhador'), Object.assign(varsVenda(v.nome, [n], false), { numero: n, premio }));
+}
+function htmlAvisoGanhadores() {
+  if (!temResultado()) return '';
+  const mapa = mapaVendas(); const itens = [];
+  cfg.premios.forEach((p, i) => {
+    const n = numeroSorteado(i);
+    if (!n || !UNI_SET.has(n)) return;
+    const v = mapa.get(n);
+    itens.push('<li><span><strong class="num">' + n + '</strong> · ' + (i + 1) + 'º prêmio (' + esc(p) + ') · ' + (v ? esc(v.nome || 'sem nome') + (v.pago ? '' : ' <em>(não está como pago)</em>') : 'não foi vendido') + '</span>' +
+      (v && v.telefone ? '<a class="btn peq primario" href="' + esc(linkWa(v.telefone, msgGanhador(v, n, p))) + '" target="_blank" rel="noopener">Avisar no WhatsApp</a>' : '') + '</li>');
+  });
+  if (!itens.length) return '<div class="aviso"><div><strong>Resultado do sorteio salvo.</strong><p>Nenhum dos números sorteados é dos seus blocos.</p></div></div>';
+  return '<div class="aviso ganhou"><div><strong>🎉 Saiu número seu no sorteio!</strong><ul class="ganhadores">' + itens.join('') + '</ul></div></div>';
+}
+
+/* =====================================================================
+   Lista de controle pra imprimir (modelo da Formô: uma página por bloco)
+   ===================================================================== */
+function imprimirLista() {
+  if (!vendasCarregadas) { toast('Espere suas vendas carregarem.'); return; }
+  const mapa = mapaVendas();
+  const quando = fmtQuando(new Date().toISOString());
+  const linha = n => {
+    const v = mapa.get(n), pago = !!(v && v.pago);
+    return '<tr><td class="li-n">' + n + '</td><td class="li-c">' + (v ? esc(v.nome || '') + (pago ? '' : ' <span class="li-res">(reservado)</span>') : '') + '</td>' +
+      '<td class="li-t">' + (v && v.telefone ? esc(foneBonito(v.telefone)) : '') + '</td><td class="li-p"><span class="li-box' + (pago ? ' ok' : '') + '">' + (pago ? '✓' : '') + '</span></td></tr>';
+  };
+  const tabela = nums => '<table><colgroup><col class="c-n"><col><col class="c-t"><col class="c-p"></colgroup><thead><tr><th>Nº</th><th>Comprador</th><th>Telefone</th><th>Pago</th></tr></thead><tbody>' + nums.map(linha).join('') + '</tbody></table>';
+  const paginas = BLOCOS.map(b => {
+    const meio = Math.ceil(b.nums.length / 2);
+    const comDono = b.nums.filter(n => mapa.has(n)).length;
+    const pagos = b.nums.filter(n => { const v = mapa.get(n); return v && v.pago; }).length;
+    return '<section class="li-pag"><header><p class="li-ed">' + esc(cfg.edicao) + ' · vendedora: ' + esc(cfg.vendedora) + '</p><h1>Controle de vendas</h1>' +
+      '<p>Bloco ' + b.ini + ' a ' + b.fim + ' · ' + pagos + ' ' + plural(pagos, 'pago', 'pagos') + ', ' + (comDono - pagos) + ' ' + plural(comDono - pagos, 'reservado', 'reservados') + ', ' + (b.nums.length - comDono) + ' ' + plural(b.nums.length - comDono, 'livre', 'livres') + '. Atualizado em ' + quando + '. Sorteio em ' + dataBR(cfg.sorteio) + '.</p></header>' +
+      '<div class="li-cols">' + tabela(b.nums.slice(0, meio)) + tabela(b.nums.slice(meio)) + '</div></section>';
+  }).join('');
+  let el = $('#impressao');
+  if (!el) { el = document.createElement('div'); el.id = 'impressao'; document.body.appendChild(el); }
+  el.innerHTML = paginas;
+  document.documentElement.classList.add('imprimindo');
+  const limpar = () => { document.documentElement.classList.remove('imprimindo'); window.removeEventListener('afterprint', limpar); };
+  window.addEventListener('afterprint', limpar);
+  setTimeout(() => { try { window.print(); } catch (e) { toast('Não consegui abrir a impressão neste aparelho.'); limpar(); } }, 60);
 }
 
 /* ---------- início ---------- */

@@ -313,3 +313,58 @@ a.ig{color:inherit;font-weight:700;text-decoration:none}
 .adm .vazio .linha-botoes{margin-top:6px}
 .pill.liberada{background:var(--taken);color:var(--muted)}
 .chip-num.riscado{text-decoration:line-through;opacity:.75}
+
+/* pedido em duas etapas */
+.etapas{list-style:none;margin:0;padding:0;display:flex;gap:8px;flex-wrap:wrap;font-size:.84rem;font-weight:600;color:var(--muted)}
+.etapas li{display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;border-radius:999px;background:var(--surface-2)}
+.etapas li span{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:999px;background:var(--line);color:var(--ink);font-size:.78rem}
+.etapas li[aria-current="step"]{background:var(--accent-soft);color:var(--accent)}
+.etapas li[aria-current="step"] span{background:var(--accent);color:var(--on-accent)}
+.etapas li.feita span{background:var(--ok);color:var(--on-ok)}
+.reservado{background:var(--ok-soft);color:var(--ink);border-radius:12px;padding:10px 12px;font-size:.92rem}
+.lgpd{font-size:.82rem}
+.meus-pedidos{display:grid;gap:10px;margin-bottom:14px}
+.meu-pedido{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--ok-soft);border:2px solid var(--ok);border-radius:var(--r);padding:12px 14px}
+.cel.meu{background:var(--ok-soft);border-color:var(--ok);color:var(--ok);box-shadow:0 3px 0 var(--ok-edge);cursor:default}
+.amostra.meu{background:var(--ok-soft);border-color:var(--ok)}
+.cod-pedido{display:block}
+.pill.vencendo{background:var(--c5);color:var(--on-c)}
+/* resultado do sorteio */
+.resultado .res-lista{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.res-item{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:4px 12px;background:var(--cor);color:var(--on-c);border:2px solid rgba(19,36,31,.85);border-radius:18px;padding:12px 16px;box-shadow:0 5px 0 rgba(19,36,31,.85)}
+.res-pos{font-family:var(--f-display);font-weight:800;font-size:1.6rem;line-height:1}
+.res-premio{font-weight:700}
+.res-num{font-size:1.25rem;background:var(--surface);color:var(--ink);border-radius:10px;padding:4px 10px}
+.res-selo{grid-column:1/-1;justify-self:start;background:var(--accent);color:var(--on-accent);border-radius:999px;padding:3px 10px;font-size:.8rem;font-weight:700}
+.res-item.meu{outline:3px solid var(--accent);outline-offset:3px}
+.res-texto{margin-top:14px;font-weight:600}
+.aviso.ganhou{background:var(--ok-soft)}
+.ganhadores{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:8px}
+.ganhadores li{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.export .linha-botoes{margin-bottom:6px}
+/* lista de controle impressa */
+#impressao{display:none}
+@media print{
+  @page{size:A4;margin:10mm 11mm}
+  html.imprimindo,html.imprimindo body{background:#fff!important}
+  html.imprimindo body::before{display:none}
+  html.imprimindo body>*:not(#impressao){display:none!important}
+  html.imprimindo #impressao{display:block}
+}
+#impressao{font-family:var(--f-body);color:#2B3A67;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.li-pag{break-after:page;page-break-after:always}
+.li-pag:last-child{break-after:auto;page-break-after:auto}
+.li-pag header{margin-bottom:4mm}
+.li-ed{font-size:7.5pt;text-transform:uppercase;letter-spacing:.12em;color:#6B7393;margin:0}
+.li-pag h1{font-size:20pt;font-weight:800;color:#2B3A67;margin:1mm 0 1.5mm;text-transform:none}
+.li-pag header p{font-size:8.5pt;color:#4A5478;margin:0}
+.li-cols{display:grid;grid-template-columns:1fr 1fr;gap:7mm}
+.li-pag table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8.5pt}
+.li-pag col.c-n{width:15mm}.li-pag col.c-t{width:27mm}.li-pag col.c-p{width:9mm}
+.li-pag th{text-align:left;font-weight:600;font-size:7.5pt;color:#2B3A67;border-bottom:1.2pt solid #2B3A67;padding:0 1.5mm 1.5mm}
+.li-pag td{border-bottom:.6pt solid #C9CEDF;padding:0 1.5mm;height:9.4mm;vertical-align:middle;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.li-pag td.li-n{font-weight:700;overflow:visible;text-overflow:clip}
+.li-p{text-align:center}
+.li-box{display:inline-block;width:10pt;height:10pt;border:1pt solid #2B3A67;border-radius:2.5pt;line-height:9pt;text-align:center;font-size:8pt;font-weight:700}
+.li-box.ok{background:#2B3A67;color:#fff}
+.li-res{color:#8A90A8;font-size:7pt}
