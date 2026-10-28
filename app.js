@@ -369,7 +369,7 @@ function ligarCarrossel() {
   const slides = $$('.slide', tr), pontos = $$('.ponto');
   const reduz = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let atual = 0, pausadoAte = 0, raf = null;
-  const marcar = () => pontos.forEach((p, k) => p.setAttribute('aria-current', String(k === atual)));
+  const marcar = () => { pontos.forEach((p, k) => p.setAttribute('aria-current', String(k === atual))); slides.forEach((s, k) => s.classList.toggle('ativo', k === atual)); };
   irPremio = (i, suave) => {
     atual = (i + slides.length) % slides.length;
     const s = slides[atual];
@@ -394,7 +394,7 @@ function ligarCarrossel() {
     if (Date.now() < pausadoAte || document.hidden || ui.folha) return;
     const b = tr.getBoundingClientRect(); if (b.bottom < 0 || b.top > innerHeight) return;
     irPremio(atual + 1, true);
-  }, 3800);
+  }, 2600);
 }
 
 /* ---------- página do comprador ---------- */
