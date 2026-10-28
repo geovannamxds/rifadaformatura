@@ -39,6 +39,16 @@ as $$
 declare
   n integer;
 begin
+  if not exists (
+    select 1 from public.vendas v
+     where not v.pago
+       and v.liberada_em is null
+       and cardinality(v.numeros) > 0
+       and v.criado_em + public.prazo_reserva() < now()
+       and (poupar is null or v.id <> poupar)
+  ) then
+    return 0;
+  end if;
   update public.vendas v
      set numeros_liberados = v.numeros,
          numeros = '{}',
