@@ -456,6 +456,7 @@ function renderPublico() {
       '<div class="canhoto"><div><span class="rot">Cada número</span><div class="preco num">' + brl(cfg.preco).replace(',00', '') + '</div></div>' +
         '<div class="canhoto-tx">' + (trechos(UNI).length === 1 ? '<span class="rot">Nº</span><span class="num">' + UNI[0] + ' a ' + UNI[UNI.length - 1] + '</span>' : '<span class="rot">Números</span><span class="num">' + UNI.length + ' à venda</span>') + '</div></div>' +
       '<div class="pilulas">' + (temResultado() ? '<a class="pilula mostarda" href="#t-res">🎉 Veja o resultado do sorteio</a>' : '<span class="pilula mostarda">Sorteio ' + dataBR(cfg.sorteio) + ' · ao vivo no ' + igLink() + '</span>' + pilulaVendas) + '</div>' +
+      '<div id="progresso-pub">' + htmlProgresso() + '</div>' +
       (aberta ? '<div class="hero-cta"><button class="btn primario" type="button" data-acao="ir-escolha">Escolher meus números</button><button class="btn" type="button" data-acao="compartilhar">Compartilhar</button></div>' : '') +
       (esgotado ? '<div class="hero-cta"><span class="pilula mostarda">Esgotou! Muito obrigada 💛🎓</span></div>' : '') +
     '</div></header>' +
@@ -556,6 +557,7 @@ function irPara(n) {
 
 /* ---------- barra de seleção ---------- */
 function renderBarra() {
+  atualizarBotaoDuvidas();
   const el = $('#barra'); if (!el) return;
   const n = ui.sel.size;
   const mostrar = n > 0 && !ui.folha && (ui.modo === 'publico' || ui.aba === 'numeros');
@@ -1458,6 +1460,7 @@ function aplicarEstado(e) {
   } else {
     renderGrade(false);
     if (linha) linha.textContent = textoLivres();
+    atualizarProgresso();
     renderBarra();
   }
   if (perdidos.length) {
@@ -1563,8 +1566,9 @@ async function enviarReserva() {
   salvarPedidoLocal(pedido);
   pedido.numeros.forEach(n => ocupadosPub.add(n));
   ui.sel.clear();
-  if (ui.modo === 'publico') { renderGrade(false); renderMeusPedidos(); const l = $('#linha-livres'); if (l) l.textContent = textoLivres(); }
+  if (ui.modo === 'publico') { renderGrade(false); renderMeusPedidos(); const l = $('#linha-livres'); if (l) l.textContent = textoLivres(); atualizarProgresso(); }
   abrirPagamento(pedido);
+  soltarConfete();
   buscarEstadoSB();
 }
 function tratarErroReserva(msg) {
@@ -1701,6 +1705,81 @@ function imprimirLista() {
   const limpar = () => { document.documentElement.classList.remove('imprimindo'); window.removeEventListener('afterprint', limpar); };
   window.addEventListener('afterprint', limpar);
   setTimeout(() => { try { window.print(); } catch (e) { toast('Não consegui abrir a impressão neste aparelho.'); limpar(); } }, 60);
+}
+
+
+/* =====================================================================
+   Toques finais: barra de vendidos, confete, botão de dúvidas
+   ===================================================================== */
+const MIN_PROGRESSO = 10; /* a barra só aparece depois de alguns números vendidos */
+function contagemVendidos() {
+  const total = UNI.length;
+  const vendidos = UNI.filter(n => ocupadosPub.has(n)).length;
+  return { total, vendidos };
+}
+function htmlProgresso() {
+  if (!cfg.mostrarContador) return '';
+  const c = contagemVendidos();
+  if (!c.total || c.vendidos < MIN_PROGRESSO) return '';
+  const pct = Math.min(100, Math.round(c.vendidos / c.total * 100));
+  const falta = c.total - c.vendidos;
+  return '<div class="progresso-pub" role="img" aria-label="' + c.vendidos + ' de ' + c.total + ' números já vendidos">' +
+    '<p><strong>🎉 Já foram <span class="num">' + c.vendidos + '</span> de <span class="num">' + c.total + '</span> números!</strong> ' +
+    (falta ? (falta <= 20 ? 'Só ' + plural(falta, 'falta ', 'faltam ') + falta + '. Me ajuda a completar 💛' : 'Me ajuda a completar 💛') : 'Todos vendidos, obrigada! 💛') + '</p>' +
+    '<div class="progresso-trilho"><span style="width:' + pct + '%"></span></div></div>';
+}
+function atualizarProgresso() {
+  const el = $('#progresso-pub'); if (el) el.innerHTML = htmlProgresso();
+}
+
+function soltarConfete() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cv = document.createElement('canvas');
+  cv.className = 'confete'; cv.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(cv);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = window.innerWidth, H = window.innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext('2d'); if (!g) { cv.remove(); return; }
+  g.scale(dpr, dpr);
+  const cores = ['#FCBA59', '#61C4E1', '#F1BFC0', '#87B9A0', '#EE6A52', '#FEEAD1'];
+  const pecas = Array.from({ length: 140 }, (_, i) => ({
+    x: W / 2 + (Math.random() - .5) * W * .3, y: H * .35 + (Math.random() - .5) * 40,
+    vx: (Math.random() - .5) * 13, vy: -Math.random() * 13 - 5,
+    r: Math.random() * Math.PI, vr: (Math.random() - .5) * .35,
+    w: 6 + Math.random() * 7, h: 9 + Math.random() * 9, cor: cores[i % cores.length], forma: i % 3
+  }));
+  const inicio = performance.now();
+  const passo = t => {
+    const dt = t - inicio;
+    g.clearRect(0, 0, W, H);
+    pecas.forEach(p => {
+      p.vy += .32; p.vx *= .992; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+      g.save(); g.translate(p.x, p.y); g.rotate(p.r); g.globalAlpha = Math.max(0, 1 - dt / 2600); g.fillStyle = p.cor;
+      if (p.forma === 0) { g.beginPath(); g.arc(0, 0, p.w / 2, 0, Math.PI * 2); g.fill(); }
+      else g.fillRect(-p.w / 2, -p.h / 2, p.w, p.forma === 1 ? p.h : p.h / 2.4);
+      g.restore();
+    });
+    if (dt < 2600) requestAnimationFrame(passo); else cv.remove();
+  };
+  requestAnimationFrame(passo);
+}
+
+function linkDuvidas() {
+  return linkWa(cfg.whatsapp, 'Oi, ' + cfg.vendedora + '! Tenho uma dúvida sobre a rifa da formatura 😊');
+}
+function atualizarBotaoDuvidas() {
+  let b = $('#duvidas');
+  const mostrar = ui.modo === 'publico' && !!cfg.whatsapp && !ui.folha && ui.sel.size === 0 && cfg.pronto;
+  if (!b) {
+    if (!mostrar) return;
+    b = document.createElement('a');
+    b.id = 'duvidas'; b.className = 'duvidas'; b.target = '_blank'; b.rel = 'noopener';
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.2 3.6c-.5.4-1.3.1-1.3-.6V16A2.5 2.5 0 0 1 4 13.5z" fill="currentColor"/><circle cx="8.5" cy="9.5" r="1.2" style="fill:var(--c5)"/><circle cx="12" cy="9.5" r="1.2" style="fill:var(--c5)"/><circle cx="15.5" cy="9.5" r="1.2" style="fill:var(--c5)"/></svg><span>Dúvidas? Fala comigo</span>';
+    document.body.appendChild(b);
+  }
+  b.href = linkDuvidas();
+  b.hidden = !mostrar;
 }
 
 /* ---------- início ---------- */

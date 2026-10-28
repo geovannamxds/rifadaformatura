@@ -368,3 +368,14 @@ a.ig{color:inherit;font-weight:700;text-decoration:none}
 .li-box{display:inline-block;width:10pt;height:10pt;border:1pt solid #2B3A67;border-radius:2.5pt;line-height:9pt;text-align:center;font-size:8pt;font-weight:700}
 .li-box.ok{background:#2B3A67;color:#fff}
 .li-res{color:#8A90A8;font-size:7pt}
+
+/* toques finais */
+.progresso-pub{width:100%;max-width:520px;display:grid;gap:8px}
+.progresso-pub p{font-size:.95rem;color:var(--hero-ink)}
+.progresso-trilho{height:14px;border-radius:999px;background:rgba(255,255,255,.14);overflow:hidden;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.18)}
+.progresso-trilho span{display:block;height:100%;min-width:14px;border-radius:999px;background:repeating-linear-gradient(135deg,var(--c5) 0 10px,#F2A93B 10px 20px);animation:encher 1.3s cubic-bezier(.2,.8,.2,1) both}
+@keyframes encher{from{width:0}}
+.confete{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:70}
+.duvidas{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:18;display:inline-flex;align-items:center;gap:8px;padding:10px 16px 10px 12px;border-radius:999px;background:var(--hero);color:var(--hero-ink);border:2px solid var(--b-borda);box-shadow:0 4px 0 var(--b-borda),var(--shadow);font-weight:700;font-size:.9rem;text-decoration:none;transition:transform .08s ease,box-shadow .08s ease}
+.duvidas:active{transform:translateY(3px);box-shadow:0 1px 0 var(--b-borda)}
+.duvidas svg{flex:none}
