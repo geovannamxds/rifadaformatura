@@ -309,3 +309,5 @@ a.ig{color:inherit;font-weight:700;text-decoration:none}
 .login-rodape{position:relative;z-index:1;text-align:center;font-size:.86rem;color:var(--hero-muted)}
 .login-rodape a{color:var(--hero-ink);font-weight:600;text-decoration:none}
 .adm .vazio .linha-botoes{margin-top:6px}
+.pill.liberada{background:var(--taken);color:var(--muted)}
+.chip-num.riscado{text-decoration:line-through;opacity:.75}

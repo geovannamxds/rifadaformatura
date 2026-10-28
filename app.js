@@ -86,7 +86,8 @@ function foneBonito(s) {
 function linkWa(fone, texto) { return 'https://wa.me/' + foneWa(fone) + '?text=' + encodeURIComponent(texto); }
 function diaSemana(iso) { try { return new Date(iso + 'T12:00:00-03:00').toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' }); } catch (e) { return ''; } }
 function prazoDe(v) { const t = Date.parse(v.criadoEm || ''); return new Date((isNaN(t) ? Date.now() : t) + (Number(cfg.prazoReserva) || 24) * 3600000); }
-function vencida(v) { return !v.pago && Date.now() > prazoDe(v).getTime(); }
+function liberada(v) { return !!v.liberadaEm && !(v.numeros || []).length; }
+function vencida(v) { return !v.pago && !liberada(v) && Date.now() > prazoDe(v).getTime(); }
 function vendasEncerradas() { return Date.now() > new Date(cfg.fimVendas + 'T23:59:59-03:00').getTime(); }
 
 /* faixas de números → universo e blocos de 50 */
@@ -650,7 +651,9 @@ function renderAvisos() {
   if (!cfg.pronto) h += '<div class="aviso alerta"><div><strong>Falta pouco pra abrir as vendas.</strong><p>Preencha seu WhatsApp e o Pix em Ajustes, confira seus números e salve. Até lá, quem abre o link vê os prêmios e um aviso de “em breve”.</p></div></div>';
   if (erroVendas) h += '<div class="aviso alerta"><p>' + esc(erroVendas) + '</p></div>';
   const nVenc = vendasCarregadas ? vendas.filter(vencida).length : 0;
-  if (nVenc) h += '<div class="aviso alerta"><div><strong>' + nVenc + ' ' + plural(nVenc, 'reserva passou', 'reservas passaram') + ' do prazo de ' + esc(prazoTexto()) + ' sem pagamento.</strong><p>Cobre de novo ou libere os números pra outras pessoas.</p></div><button class="btn peq" type="button" data-acao="ver-vencidas">Ver ' + plural(nVenc, 'reserva', 'reservas') + '</button></div>';
+  if (nVenc) h += '<div class="aviso alerta"><div><strong>' + nVenc + ' ' + plural(nVenc, 'reserva passou', 'reservas passaram') + ' do prazo de ' + esc(prazoTexto()) + ' sem pagamento.</strong><p>' + (TEM_SB ? 'Os números já aparecem livres pros compradores e saem da venda sozinhos em alguns minutos.' : 'Cobre de novo ou libere os números pra outras pessoas.') + '</p></div><button class="btn peq" type="button" data-acao="ver-vencidas">Ver ' + plural(nVenc, 'reserva', 'reservas') + '</button></div>';
+  const nLib = vendasCarregadas ? vendas.filter(v => liberada(v) && Date.now() - Date.parse(v.liberadaEm) < 86400000).length : 0;
+  if (nLib) h += '<div class="aviso"><div><strong>' + nLib + ' ' + plural(nLib, 'reserva foi liberada', 'reservas foram liberadas') + ' nas últimas 24 horas.</strong><p>O pagamento não chegou no prazo, então os números voltaram a ficar livres. Se alguém pagou atrasado, toque em “Recebi o pagamento” na venda.</p></div><button class="btn peq" type="button" data-acao="ver-liberadas">Ver ' + plural(nLib, 'liberada', 'liberadas') + '</button></div>';
   const p = pendentes();
   if (p > 0 && cfg.pronto) {
     h += '<div class="aviso"><div><strong>' + p + ' ' + plural(p, 'número mudou', 'números mudaram') + ' desde a última atualização da página dos compradores.</strong>' +
@@ -704,8 +707,8 @@ function renderAba() {
 function renderLista() {
   const el = $('#lista'); if (!el) return;
   const fl = $('#filtros');
-  const aReceber = vendas.filter(v => !v.pago).length, semBilhete = vendas.filter(v => v.pago && !v.bilhete).length, nVenc = vendas.filter(vencida).length;
-  if (fl) fl.innerHTML = [['todas', 'Todas', vendas.length], ['receber', 'A receber', aReceber], ['vencidas', 'Reserva vencida', nVenc], ['bilhete', 'Bilhete a enviar', semBilhete]].filter(f => f[0] !== 'vencidas' || f[2] || ui.filtro === 'vencidas')
+  const nLiberadas = vendas.filter(liberada).length, aReceber = vendas.filter(v => !v.pago && !liberada(v)).length, semBilhete = vendas.filter(v => v.pago && !v.bilhete).length, nVenc = vendas.filter(vencida).length;
+  if (fl) fl.innerHTML = [['todas', 'Todas', vendas.length], ['receber', 'A receber', aReceber], ['vencidas', 'Reserva vencida', nVenc], ['bilhete', 'Bilhete a enviar', semBilhete], ['liberadas', 'Liberadas', nLiberadas]].filter(f => (f[0] !== 'vencidas' && f[0] !== 'liberadas') || f[2] || ui.filtro === f[0])
     .map(f => '<button type="button" class="filtro" data-filtro="' + f[0] + '" aria-pressed="' + (ui.filtro === f[0]) + '">' + f[1] + ' (' + f[2] + ')</button>').join('');
   if (!vendasCarregadas) { el.innerHTML = erroVendas ? '' : '<p class="dica">Carregando…</p>'; return; }
   if (!vendas.length) {
@@ -714,12 +717,38 @@ function renderLista() {
   }
   const q = ui.busca.trim().toLowerCase();
   const arr = vendas.slice()
-    .filter(v => ui.filtro === 'todas' || (ui.filtro === 'receber' ? !v.pago : ui.filtro === 'vencidas' ? vencida(v) : (v.pago && !v.bilhete)))
-    .filter(v => !q || String(v.nome || '').toLowerCase().includes(q) || (v.numeros || []).some(n => String(n).includes(q)) || soDigitos(v.telefone).includes(soDigitos(q) || '§'))
+    .filter(v => ui.filtro === 'todas' || (ui.filtro === 'receber' ? (!v.pago && !liberada(v)) : ui.filtro === 'vencidas' ? vencida(v) : ui.filtro === 'liberadas' ? liberada(v) : (v.pago && !v.bilhete)))
+    .filter(v => !q || String(v.nome || '').toLowerCase().includes(q) || (v.numeros || []).concat(v.numerosLiberados || []).some(n => String(n).includes(q)) || soDigitos(v.telefone).includes(soDigitos(q) || '§'))
     .sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')));
   el.innerHTML = arr.length ? arr.map(cardVenda).join('') : '<p class="dica">Nenhuma venda encontrada.</p>';
 }
+function cardLiberada(v) {
+  const nums = ordenar(v.numerosLiberados || []);
+  return '<article class="venda liberada">' +
+    '<div class="venda-topo"><span class="pill liberada">Reserva liberada</span><span class="num">' + brl(nums.length * cfg.preco) + '</span></div>' +
+    '<div><h3 class="venda-nome">' + esc(v.nome || 'Sem nome') + '</h3>' + (v.telefone ? '<span class="dica">' + esc(foneBonito(v.telefone)) + '</span>' : '') + '</div>' +
+    '<div class="chips">' + nums.map(n => '<span class="chip-num riscado">' + n + '</span>').join('') + '</div>' +
+    '<p class="dica">Reservou em ' + fmtQuando(v.criadoEm) + ' · liberada em ' + fmtQuando(v.liberadaEm) + ', porque o pagamento não chegou no prazo.</p>' +
+    (v.obs ? '<p class="dica">' + esc(v.obs) + '</p>' : '') +
+    '<div class="venda-acoes">' +
+      '<button class="btn peq ok" type="button" data-acao="devolver-pago" data-venda="' + esc(v.id) + '">Recebi o pagamento</button>' +
+      '<button class="btn peq" type="button" data-acao="devolver-reserva" data-venda="' + esc(v.id) + '">Reservar de novo</button>' +
+      '<button class="btn peq fantasma" type="button" data-acao="editar-venda" data-venda="' + esc(v.id) + '">Editar</button>' +
+    '</div></article>';
+}
+function devolverNumeros(id, pago) {
+  const v = vendas.find(x => x.id === id); if (!v) return;
+  const nums = ordenar(v.numerosLiberados || []);
+  if (!nums.length) { toast('Essa venda não tem números guardados. Toque em Editar pra escolher.'); return; }
+  const a = analisarNumeros(nums, id);
+  if (a.deOutro.length) { toast(a.deOutro.map(o => o.n + ' já é de ' + (primeiroNome(o.v.nome) || 'outra pessoa')).join('; ') + '. Toque em Editar pra escolher outros.'); return; }
+  const agora = new Date().toISOString();
+  const campos = { numeros: nums, numerosLiberados: [], liberadaEm: null };
+  if (pago) Object.assign(campos, { pago: true, pagoEm: agora }); else campos.criadoEm = agora;
+  atualizarVenda(id, campos, pago ? 'Pagamento registrado. Os números voltaram pra ' + (primeiroNome(v.nome) || 'essa venda') + '.' : 'Reservado de novo. Novo prazo: ' + fmtQuando(new Date(Date.now() + (Number(cfg.prazoReserva) || 24) * 3600000).toISOString()) + '.');
+}
 function cardVenda(v) {
+  if (liberada(v)) return cardLiberada(v);
   const nums = ordenar(v.numeros || []);
   let acoes = '';
   const venc = vencida(v);
@@ -759,12 +788,12 @@ function lerPedido(txt) {
   return { nome: nome ? nome.trim() : '', numeros: lerNumeros(txt, true) };
 }
 function analisarNumeros(nums, idAtual) {
-  const mapa = mapaVendas(); const fora = [], deOutro = [];
+  const mapa = mapaVendas(); const fora = [], deOutro = [], vencidos = [];
   nums.forEach(n => {
     if (!UNI_SET.has(n)) fora.push(n);
-    else { const v = mapa.get(n); if (v && v.id !== idAtual) deOutro.push({ n, v }); }
+    else { const v = mapa.get(n); if (v && v.id !== idAtual) { if (TEM_SB && vencida(v)) vencidos.push({ n, v }); else deOutro.push({ n, v }); } }
   });
-  return { fora, deOutro };
+  return { fora, deOutro, vencidos };
 }
 function abrirVenda(v, numsIniciais) {
   ui.vendaEdit = v ? v.id : null; ui.confirmarExclusao = false;
@@ -790,6 +819,7 @@ function abrirVenda(v, numsIniciais) {
     let h = ns.length ? ns.length + ' ' + plural(ns.length, 'número', 'números') : 'Nenhum número ainda.';
     if (a.fora.length) h += '<br><span class="erro">' + listaNums(a.fora) + plural(a.fora.length, ' não está', ' não estão') + ' nos seus blocos.</span>';
     a.deOutro.forEach(o => { h += '<br><span class="erro">' + o.n + ' já é de ' + esc(o.v.nome || 'outra pessoa') + '.</span>'; });
+    a.vencidos.forEach(o => { h += '<br>' + o.n + ' estava reservado pra ' + esc(primeiroNome(o.v.nome) || 'outra pessoa') + ', mas a reserva venceu: ao salvar, ele vem pra esta venda.'; });
     $('#v-numeros-info').innerHTML = h;
     $('#v-total').textContent = brl(ns.length * cfg.preco);
   };
@@ -830,7 +860,7 @@ async function salvarVenda() {
   const pago = $('#v-pago').checked;
   const doc = {
     nome, numeros: nums, telefone: soDigitos($('#v-tel').value), pago, bilhete: $('#v-bilhete').checked,
-    obs: $('#v-obs').value.trim(), criadoEm: antiga ? (antiga.criadoEm || agora) : agora, atualizadoEm: agora,
+    obs: $('#v-obs').value.trim(), criadoEm: antiga && !(liberada(antiga) && !pago) ? (antiga.criadoEm || agora) : agora, atualizadoEm: agora,
     pagoEm: pago ? ((antiga && antiga.pagoEm) || agora) : null
   };
   salvando = true; $('#v-salvar').disabled = true;
@@ -884,7 +914,7 @@ function htmlAjustes() {
       '<div class="campo"><label for="a-faixas">Seus números</label><input id="a-faixas" type="text" autocomplete="off" value="' + esc(cfg.faixas) + '"><p class="dica">Escreva o primeiro e o último número de cada sequência, separados por vírgula. Ex.: 19201-19300, 19351-19500. Confira na lista de blocos do PDF da Formô.</p><p class="blocos-prev" id="a-faixas-info"></p></div>' +
       '<div class="campo"><label for="a-titulo">Título da página</label><input id="a-titulo" type="text" value="' + esc(cfg.titulo) + '"></div>' +
       '<div class="campo"><label for="a-link">Link pra divulgar</label><input id="a-link" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://tinyurl.com/..." value="' + esc(cfg.link) + '"><p class="dica">É o link do botão “Copiar link” e das mensagens de divulgação.</p></div>' +
-      '<div class="campo"><label for="a-prazo">Prazo pra pagar uma reserva</label><select id="a-prazo">' + [12, 24, 48, 72].map(h => '<option value="' + h + '"' + (Number(cfg.prazoReserva || 24) === h ? ' selected' : '') + '>' + (h >= 48 ? (h / 24) + ' dias' : h + ' horas') + '</option>').join('') + '</select><p class="dica">Depois desse prazo sem pagamento, a venda aparece como “Reserva vencida” pra você cobrar ou liberar os números.</p></div>' +
+      '<div class="campo"><label for="a-prazo">Prazo pra pagar uma reserva</label><select id="a-prazo">' + [12, 24, 48, 72].map(h => '<option value="' + h + '"' + (Number(cfg.prazoReserva || 24) === h ? ' selected' : '') + '>' + (h >= 48 ? (h / 24) + ' dias' : h + ' horas') + '</option>').join('') + '</select><p class="dica">' + (TEM_SB ? 'Depois desse prazo sem pagamento, os números voltam a ficar livres sozinhos. A venda vai pro filtro “Liberadas”, caso a pessoa pague depois.' : 'Depois desse prazo sem pagamento, a venda aparece como “Reserva vencida” pra você cobrar ou liberar os números.') + '</p></div>' +
       '<label class="opcao" for="a-contador"><input id="a-contador" type="checkbox"' + (cfg.mostrarContador ? ' checked' : '') + '><span>Mostrar quantos números ainda estão livres</span></label>' +
     '</fieldset>' +
     '<p class="erro" id="a-erro" hidden></p>' +
@@ -1054,6 +1084,9 @@ document.addEventListener('click', e => {
     case 'sair': sair(); break;
     case 'recarregar': location.reload(); break;
     case 'liberar': { const v = vendas.find(x => x.id === id); if (v) { abrirVenda(v); ui.confirmarExclusao = true; renderZonaExcluir(); const z = $('#zona-excluir'); if (z) z.scrollIntoView({ block: 'center' }); } break; }
+    case 'devolver-pago': devolverNumeros(id, true); break;
+    case 'devolver-reserva': devolverNumeros(id, false); break;
+    case 'ver-liberadas': ui.aba = 'vendas'; ui.filtro = 'liberadas'; renderAba(); { const l = $('#lista'); if (l) l.scrollIntoView({ block: 'start' }); } break;
     case 'ver-vencidas': ui.aba = 'vendas'; ui.filtro = 'vencidas'; renderAba(); { const l = $('#lista'); if (l) l.scrollIntoView({ block: 'start' }); } break;
     case 'msg-original': { const k = t.dataset.msg, ta = $('#m-' + k); if (ta) { ta.value = MSGS_PADRAO[k]; previaMsg(k); toast('Texto original de volta. Toque em Salvar mensagens pra valer.'); } break; }
   }
@@ -1157,17 +1190,19 @@ if (TEM_SB && PAGINA !== 'admin') {
    Versão do site (GitHub Pages) com banco de dados no Supabase
    ===================================================================== */
 const SB_TABELA = 'vendas';
-const CAMPOS_VENDA = { nome: 'nome', telefone: 'telefone', numeros: 'numeros', pago: 'pago', bilhete: 'bilhete', obs: 'obs', criadoEm: 'criado_em', atualizadoEm: 'atualizado_em', pagoEm: 'pago_em' };
+const CAMPOS_VENDA = { nome: 'nome', telefone: 'telefone', numeros: 'numeros', pago: 'pago', bilhete: 'bilhete', obs: 'obs', criadoEm: 'criado_em', atualizadoEm: 'atualizado_em', pagoEm: 'pago_em', liberadaEm: 'liberada_em', numerosLiberados: 'numeros_liberados' };
 function paraLinha(d) {
   const r = {};
   Object.keys(CAMPOS_VENDA).forEach(k => { if (k in d) r[CAMPOS_VENDA[k]] = d[k]; });
   if (r.numeros) r.numeros = r.numeros.map(Number);
+  if (r.numeros_liberados) r.numeros_liberados = r.numeros_liberados.map(Number);
   return r;
 }
 function daLinha(r) {
   const d = {};
   Object.keys(CAMPOS_VENDA).forEach(k => { d[k] = r[CAMPOS_VENDA[k]]; });
   d.numeros = (d.numeros || []).map(Number); d.obs = d.obs || ''; d.telefone = d.telefone || '';
+  d.numerosLiberados = (d.numerosLiberados || []).map(Number); d.liberadaEm = d.liberadaEm || null;
   return d;
 }
 function falhaSB(error) {
@@ -1248,7 +1283,8 @@ function downloadsNavegador() {
 /* página pública e painel usam a mesma lista de números ocupados */
 function sincronizarPublico() {
   if (!vendasCarregadas) return;
-  ocupadosPub.clear(); ocupadosAtuais().forEach(n => ocupadosPub.add(n));
+  ocupadosPub.clear();
+  vendas.forEach(v => { if (!vencida(v)) (v.numeros || []).forEach(n => ocupadosPub.add(Number(n))); });
   atualizadoPub = new Date().toISOString();
 }
 
