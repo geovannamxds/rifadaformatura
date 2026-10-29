@@ -189,12 +189,12 @@ const MSGS_PADRAO = {
   pedido: 'Oi, {vendedora}! Fiz um pedido na página da rifa 🎉\nPedido: {pedido}\nNome: {nome}\nNúmeros: {numeros}\nTotal: {total}\nSegue o comprovante do Pix.',
   ganhador: 'Oi, {nome}! 🎉 Seu número {numero} foi sorteado na rifa da formatura e você ganhou: {premio}! Já te passo os próximos passos pra retirar o prêmio com a Formô.',
   bilhete: 'Oi, {nome}! Pagamento confirmado, muito obrigada pela ajuda 💛\nSeus números da rifa: {numeros}\nJá vou te mandar os bilhetes digitais aqui. Guarda eles até o sorteio, tá?\nO sorteio é dia {sorteio}, ao vivo no {instagram}. Boa sorte!',
-  cobranca: 'Oi, {nome}! Tudo bem? Separei pra você os números {numeros} da rifa da formatura 😊\nO total ficou {total}. Minha chave Pix é {chave}.\nPra garantir seus números, o pagamento precisa chegar até {prazo}, tá? Depois disso eles voltam a ficar livres.\nQuando pagar, me manda o comprovante aqui. Obrigada!',
+  cobranca: 'Oi, {nome}! Tudo bem? Separei pra você os números {numeros} da rifa da formatura 😊\nO total ficou {total}. Minha chave Pix é {chave}.\nPra garantir seus números, o pagamento precisa chegar até {prazo}, tá? Depois disso eles voltam a ficar livres.\nQuando pagar, é só anexar o comprovante na página da rifa, no aviso “Seu pedido”, ou me mandar aqui. Obrigada!',
   divulgar: 'Gente, tô vendendo a rifa da minha formatura! 🎓\nSão 5 prêmios: {premios}. Cada número custa {preco} e o sorteio é dia {sorteio}.\nEscolhe os seus aqui: {link}\nCada número me ajuda muito, obrigada!',
   divulgarAmigos: 'Tô ajudando a {vendedora} com a rifa da formatura dela! 🎓 São 5 prêmios, incluindo um {premio1}, e cada número custa {preco}.\nEscolhe os seus aqui: {link}'
 };
 const MSGS_INFO = [
-  ['pedido', 'Pedido do comprador', 'O comprador manda pra você junto com o comprovante, quando toca em “Já paguei: mandar comprovante”.', ['vendedora', 'pedido', 'nome', 'numeros', 'total']],
+  ['pedido', 'Pedido do comprador', 'O comprador manda pra você quando prefere mandar o comprovante pelo WhatsApp (o caminho principal é anexar na própria página).', ['vendedora', 'pedido', 'nome', 'numeros', 'total']],
   ['bilhete', 'Envio do bilhete', 'Você manda depois de confirmar o pagamento, junto com as imagens dos bilhetes.', ['nome', 'numeros', 'total', 'sorteio', 'instagram']],
   ['cobranca', 'Cobrança', 'Você manda pra quem reservou e ainda não pagou.', ['nome', 'numeros', 'total', 'chave', 'prazo', 'pix']],
   ['divulgar', 'Divulgação (sua)', 'O texto que vai quando você toca em Divulgar.', ['premios', 'premio1', 'preco', 'sorteio', 'link']],
@@ -467,7 +467,7 @@ function renderPublico() {
   $('#app').innerHTML =
     (ui.ehDona ? '<div class="faixa-dona"><span>Você está vendo a página como o comprador vê.</span><button class="btn peq" type="button" data-acao="painel">Voltar ao painel</button></div>' : '') +
     '<header class="hero banda"><canvas class="rabiscos" data-preset="hero" aria-hidden="true"></canvas><div class="wrap">' +
-      '<span class="selo">' + esc(cfg.edicao) + ' · com a ' + V + '</span>' +
+      '<span class="selo">' + esc(cfg.edicao) + ' · com a ' + V + '</span>' + htmlBotaoConta() +
       '<h1>' + tituloHTML(cfg.titulo) + '</h1>' + htmlBoneco() +
       '<p class="lede">' + esc(cfg.subtitulo) + '</p>' +
       '<div class="canhoto"><div><span class="rot">Cada número</span><div class="preco num">' + brl(cfg.preco).replace(',00', '') + '</div></div>' +
@@ -484,12 +484,12 @@ function renderPublico() {
         (TEM_SB
           ? '<li><span class="bola">1</span><strong>Escolha os números</strong><span>Toque nos números livres. Pode escolher até ' + MAX_POR_PEDIDO + ' por pedido.</span></li>' +
             '<li><span class="bola">2</span><strong>Gere o Pix</strong><span>Coloque seu nome e WhatsApp e toque em Gerar Pix: os números ficam reservados pra você.</span></li>' +
-            '<li><span class="bola">3</span><strong>Pague e mande o comprovante</strong><span>Depois de pagar, toque em “Já paguei”: o WhatsApp abre com o seu pedido pronto.</span></li>'
+            '<li><span class="bola">3</span><strong>Pague e anexe o comprovante</strong><span>Depois de pagar, toque em “Anexar comprovante” e mande o print ou o PDF do Pix. Seus números ficam guardados enquanto eu confiro.</span></li>'
           : '<li><span class="bola">1</span><strong>Escolha os números</strong><span>Toque nos números livres. Pode escolher quantos quiser.</span></li>' +
             '<li><span class="bola">2</span><strong>Pague por Pix</strong><span>A chave, o código e o QR Code aparecem com o valor certinho quando você tocar em Continuar.</span></li>' +
             '<li><span class="bola">3</span><strong>Mande o pedido no WhatsApp</strong><span>A mensagem já vai pronta. Manda o comprovante na mesma conversa.</span></li>') +
         '<li><span class="bola">4</span><strong>Receba seu bilhete</strong><span>Eu confirmo o pagamento e te mando o bilhete digital de cada número.</span></li>' +
-      '</ol><p class="aviso-reserva">⏳ ' + (TEM_SB ? 'Quando você gera o Pix, os números ficam reservados pra você por ' : 'Depois que você me manda o pedido, eu seguro os números pra você por ') + P + '. Se o pagamento não chegar nesse prazo, eles voltam a ficar livres pra outra pessoa.</p></div></section>' +
+      '</ol><p class="aviso-reserva">⏳ ' + (TEM_SB ? 'Quando você gera o Pix, os números ficam reservados pra você por ' : 'Depois que você me manda o pedido, eu seguro os números pra você por ') + P + '. ' + (TEM_SB ? 'Se o comprovante não for anexado nesse prazo' : 'Se o pagamento não chegar nesse prazo') + ', eles voltam a ficar livres pra outra pessoa.</p></div></section>' +
       '<section class="banda banda-rosa" aria-labelledby="t-ganhou"><canvas class="rabiscos" data-preset="rosa" aria-hidden="true"></canvas><div class="wrap secao"><div class="secao-cab"><h2 id="t-ganhou">Se o seu número sair</h2><p class="lede-g">São 5 números sorteados, um para cada prêmio.</p></div><ol class="passos-g">' +
         '<li><span class="bola">1</span><strong>Eu te aviso</strong><span>Acompanhe a live no ' + igLink() + '. Se um número seu for sorteado, eu te chamo no WhatsApp que você usou na compra.</span></li>' +
         '<li><span class="bola">2</span><strong>Fale com a Formô</strong><span>Com o aviso em mãos, você entra em contato com a Formô pra confirmar o número e combinar a retirada.</span></li>' +
@@ -498,7 +498,7 @@ function renderPublico() {
       '<section class="wrap secao" aria-labelledby="t-duvidas"><h2 id="t-duvidas">Dúvidas</h2><div class="faq">' +
         '<details><summary>Quando é o sorteio?</summary><p>' + diaSemana(cfg.sorteio).replace(/^./, c => c.toUpperCase()) + ', ' + dataBR(cfg.sorteio) + ', ao vivo no Instagram ' + igLink() + '.</p><p><strong>🚨 Atenção:</strong> as vendas vão até o dia ' + dataBR(cfg.fimVendas) + '.</p></details>' +
         '<details><summary>Posso comprar mais de um número?</summary><p>Pode sim, quantos quiser!' + (TEM_SB ? ' Cada pedido vai até ' + MAX_POR_PEDIDO + ' números; se quiser mais, é só fazer outro pedido.' : '') + ' No sorteio saem 5 números, um para cada prêmio. Cada número que você compra é mais uma chance de estar entre eles, então quanto mais números, maiores as suas chances.</p></details>' +
-        '<details><summary>Escolhi meus números. Eles já são meus?</summary><p>Ainda não! Escolher na página não separa nenhum número. ' + (TEM_SB ? 'Quando você coloca seu nome e WhatsApp e gera o Pix, os números ficam reservados pra você por ' : 'Quando você me manda o pedido no WhatsApp, eu reservo os números pra você por ') + P + '. Se o pagamento chegar nesse prazo, eles são seus; se não, voltam a ficar livres pra outra pessoa.</p></details>' +
+        '<details><summary>Escolhi meus números. Eles já são meus?</summary><p>Ainda não! Escolher na página não separa nenhum número. ' + (TEM_SB ? 'Quando você coloca seu nome e WhatsApp e gera o Pix, os números ficam reservados pra você por ' : 'Quando você me manda o pedido no WhatsApp, eu reservo os números pra você por ') + P + '. ' + (TEM_SB ? 'Se você anexar o comprovante nesse prazo, eles ficam guardados até eu confirmar o pagamento, e aí são seus. Se não, voltam a ficar livres pra outra pessoa.' : 'Se o pagamento chegar nesse prazo, eles são seus; se não, voltam a ficar livres pra outra pessoa.') + '</p></details>' +
         '<details><summary>Meu número está garantido no sorteio?</summary><p>Depois que eu confirmo o seu pagamento, o número é seu. Eu registro cada venda e pago o bloco à Formô na conferência, de ' + esc(cfg.conferencia) + ', e é isso que coloca os números no sorteio.</p></details>' +
         '<details><summary>Vou receber um bilhete de papel?</summary><p>Não, a rifa é 100% digital: cada número é um bilhete em imagem, que chega pelo WhatsApp. Guarde essas imagens até o sorteio. Se quiser, dá pra imprimir.</p></details>' +
         '<details><summary>Quem organiza a rifa?</summary><p>A Formô, empresa que organiza a formatura, e o sorteio é feito por ela. O valor dos números vai para a arrecadação da minha formatura.</p></details>' +
@@ -1136,6 +1136,10 @@ document.addEventListener('click', e => {
     case 'pausar': abrirPausa(); break;
     case 'enviar-bilhete': abrirEnvioBilhete(id); break;
     case 'boneco': pularBoneco(t); break;
+    case 'conta': abrirConta(); break;
+    case 'esquecer-pedidos': esquecerPedidos(t); break;
+    case 'aviso-mesmos': reservarDeNovo(t.dataset.nums); break;
+    case 'aviso-outros': irEscolherOutros(); break;
     case 'ver-comprovante': abrirComprovantes(id); break;
     case 'comp-pago': fecharFolha(); atualizarVenda(id, { pago: true, pagoEm: new Date().toISOString() }, 'Marcado como pago'); break;
     case 'ver-conferir': ui.aba = 'vendas'; ui.filtro = 'conferir'; renderAba(); { const l = $('#lista'); if (l) l.scrollIntoView({ block: 'start' }); } break;
@@ -1556,8 +1560,10 @@ function htmlMeusPedidos() {
       txt = '⏳ A reserva venceu antes do pagamento e os números voltaram a ficar livres. Já pagou? Anexe o comprovante que eu confiro.';
       botao = '<button class="btn peq" type="button" data-acao="ver-pedido" data-codigo="' + esc(p.codigo) + '">Ver pedido</button>';
     } else {
-      txt = (p.enviado ? 'Você me mandou o comprovante pelo WhatsApp. Eu confiro cada pagamento manualmente: assim que eu conferir, te mando o bilhete. ' : 'Reservado até ' + fmtQuando(p.prazo) + '. Falta pagar e ' + (servidorNovo ? 'anexar o comprovante.' : 'me mandar o comprovante.'));
-      botao = '<button class="btn peq' + (p.enviado ? '' : ' primario') + '" type="button" data-acao="ver-pedido" data-codigo="' + esc(p.codigo) + '">' + (p.enviado ? 'Ver pedido' : 'Pagar') + '</button>';
+      txt = p.enviado
+        ? 'Você me mandou o comprovante pelo WhatsApp. Pra garantir seus números enquanto eu confiro, anexe ele aqui também: o pedido fica reservado só até ' + fmtQuando(p.prazo) + '.'
+        : 'Reservado até ' + fmtQuando(p.prazo) + '. Falta pagar e anexar o comprovante.';
+      botao = '<button class="btn peq primario" type="button" data-acao="ver-pedido" data-codigo="' + esc(p.codigo) + '">' + (p.enviado ? 'Anexar comprovante' : 'Pagar') + '</button>';
     }
     return '<div class="meu-pedido ' + s + '"><div><strong>Seu pedido ' + esc(p.codigo) + '</strong> · ' + esc(listaNums(nums)) + ' · <span class="num">' + brl(nums.length * cfg.preco) + '</span>' +
       '<br><span class="dica">' + txt + '</span></div>' + botao + '</div>';
@@ -1566,7 +1572,7 @@ function htmlMeusPedidos() {
 function msgSemReserva(nums) {
   return 'Oi, ' + cfg.vendedora + '! Tentei reservar pela página os números ' + listaNums(nums) + ', mas não consegui. Pode reservar pra mim? 😊';
 }
-function renderMeusPedidos() { const el = $('#meus-pedidos'); if (el) el.innerHTML = htmlMeusPedidos(); atualizarLegendaPub(); }
+function renderMeusPedidos() { const el = $('#meus-pedidos'); if (el) el.innerHTML = htmlMeusPedidos(); atualizarLegendaPub(); atualizarBotaoConta(); }
 
 function abrirPedido() {
   if (TEM_SB && !ui.pedidoPeloWhats) abrirCheckout(); else abrirPedidoWhats();
@@ -1696,16 +1702,13 @@ function abrirPagamento(p) {
       htmlAnexar(p) + '<p class="erro" id="p-arq-erro" role="alert" hidden></p>' +
       (avisarWa ? '<p class="dica">Ou <a class="link" href="' + esc(avisarWa) + '" target="_blank" rel="noopener">fale comigo no WhatsApp</a>.</p>' : '');
   } else {
-    topo = '<p class="reservado">✅ Números reservados pra você até <strong>' + fmtQuando(p.prazo) + '</strong></p>';
+    topo = '<p class="reservado">✅ Números reservados pra você até <strong>' + fmtQuando(p.prazo) + '</strong></p>' +
+      (p.enviado ? '<p class="reservado vencido">Você já me mandou o comprovante pelo WhatsApp? Anexe aqui também: é isso que segura seus números enquanto eu confiro.</p>' : '');
     corpo = htmlEtapas(2) +
       '<ol class="passos">' + htmlPixPedido(total, 'pix-cc-pedido', p) +
-        (servidorNovo
-          ? '<li><h3>Anexe o comprovante</h3><p>Depois de pagar, anexe aqui o print ou o PDF do comprovante do Pix. É assim que o seu pedido fica guardado enquanto eu confiro.</p>' +
+        '<li><h3>Anexe o comprovante</h3><p>Depois de pagar, anexe aqui o print ou o PDF do comprovante do Pix. É assim que o seu pedido fica guardado enquanto eu confiro.</p>' +
             htmlAnexar(p) + '<p class="erro" id="p-arq-erro" role="alert" hidden></p>' +
-            (avisarWa ? '<p class="dica">Prefere mandar pelo WhatsApp? <a class="link" href="' + esc(avisarWa) + '" target="_blank" rel="noopener" data-acao="mandou-comprovante" data-codigo="' + esc(p.codigo) + '">Mandar no WhatsApp</a>' + (cfg.whatsapp ? ' · ' + esc(foneBonito(cfg.whatsapp)) + ' · código <strong>' + esc(p.codigo) + '</strong>' : '') + '</p>' : '')
-          : '<li><h3>Me mande o comprovante</h3><p>Depois de pagar, toque no botão: o WhatsApp abre com o seu pedido pronto. É só anexar o comprovante do Pix.</p>' +
-            (avisarWa ? '<a class="btn primario largo" href="' + esc(avisarWa) + '" target="_blank" rel="noopener" data-acao="mandou-comprovante" data-codigo="' + esc(p.codigo) + '">Já paguei: mandar comprovante</a>' +
-              '<p class="dica">Se o WhatsApp não abrir, mande o comprovante pro número <span class="num">' + esc(foneBonito(cfg.whatsapp)) + '</span> com o código <strong>' + esc(p.codigo) + '</strong> · <button class="link" type="button" data-copiar="' + esc(soDigitos(cfg.whatsapp)) + '">copiar número</button></p>' : '')) +
+            (avisarWa ? '<p class="dica">Prefere mandar pelo WhatsApp? <a class="link" href="' + esc(avisarWa) + '" target="_blank" rel="noopener" data-acao="mandou-comprovante" data-codigo="' + esc(p.codigo) + '">Mandar no WhatsApp</a>' + (cfg.whatsapp ? ' · ' + esc(foneBonito(cfg.whatsapp)) + ' · código <strong>' + esc(p.codigo) + '</strong>' : '') + '</p>' : '') +
         '</li>' +
       '</ol>' +
       '<p class="nota">Eu confiro cada pagamento manualmente, então pode levar um tempinho pra aparecer como pago. Quando eu confirmar, aparece “Pagamento confirmado” no seu pedido e te mando o bilhete digital de cada número pelo WhatsApp. Se fechar esta janela, o pedido continua aqui na página, no aviso “Seu pedido”. 💛</p>';
@@ -1896,7 +1899,7 @@ function abrirPausa() {
   abrirFolha('pausa',
     '<div class="folha-cab">' + cabFolha('Pausar as vendas') + '</div>' +
     '<form class="folha-corpo" id="f-pausa" novalidate>' +
-      '<p>Enquanto estiver pausado, quem abrir a página vê os prêmios e o seu aviso, mas não consegue reservar números. Quem já tem pedido continua conseguindo pagar e te mandar o comprovante.</p>' +
+      '<p>Enquanto estiver pausado, quem abrir a página vê os prêmios e o seu aviso, mas não consegue reservar números. Quem já tem pedido continua conseguindo pagar e anexar o comprovante.</p>' +
       '<div class="campo"><label for="pausa-msg">Aviso que aparece na página</label><textarea id="pausa-msg" rows="3">' + esc(cfg.msgPausa || MSG_PAUSA_PADRAO) + '</textarea></div>' +
       '<button class="btn primario largo" type="submit" id="pausa-ok">Pausar agora</button>' +
     '</form>');
@@ -2031,9 +2034,11 @@ function desenharRabiscos() {
     });
     h += '<path class="rabisco" style="stroke:var(' + cores[i % cores.length] + ');stroke-width:' + (12 * Math.min(k, 1.3)).toFixed(1) + '" transform="translate(' + melhor.tx.toFixed(0) + ' ' + melhor.ty.toFixed(0) + ') rotate(' + (ang * 57.3).toFixed(0) + ')" d="' + f.d + '"/>';
   });
-  /* um rabisco no topo, como antes */
-  const topo = formaInfo('mola', 88 * k);
-  h += '<path class="rabisco" style="stroke:var(--c5);stroke-width:' + (14 * Math.min(k, 1.3)).toFixed(1) + '" transform="translate(' + (W * .95).toFixed(0) + ' ' + ((blocos[0] ? blocos[0].top : 0) + 4).toFixed(0) + ') rotate(20)" d="' + topo.d + '"/>';
+  /* um rabisco no topo, espiando pela borda direita, abaixo do botão "Meus pedidos" */
+  const topo = formaInfo('mola', 80 * k);
+  const bc = $('.btn-conta', app);
+  const yTopo = bc ? bc.getBoundingClientRect().bottom - app.getBoundingClientRect().top + 26 : (blocos[0] ? blocos[0].top : 0) + 4;
+  h += '<path class="rabisco" style="stroke:var(--c5);stroke-width:' + (14 * Math.min(k, 1.3)).toFixed(1) + '" transform="translate(' + (bc ? W + 4 : W * .95).toFixed(0) + ' ' + yTopo.toFixed(0) + ') rotate(' + (bc ? 28 : 20) + ')" d="' + topo.d + '"/>';
   /* rifinhas bem transparentes espalhadas pela página, nos espaços livres */
   const nRif = Math.max(6, Math.round(H / 340));
   const passo = H / nRif;
@@ -2221,7 +2226,7 @@ function pedidoVisivel(p) {
   const s = situacaoDe(p);
   if (s === 'aguardando') return Date.parse(p.prazo) > Date.now();
   if (s === 'comprovante' || s === 'pago') return true;
-  if (s === 'liberado') return Date.now() - Date.parse(p.criado || 0) < 3 * 86400000;
+  if (s === 'liberado') return false; /* venceu: some da lista (o aviso "Poxa, seu pedido expirou" cuida disso) */
   return false;
 }
 function pedidoSeguraNumeros(p) { return pedidoVisivel(p) && situacaoDe(p) !== 'liberado'; }
@@ -2261,16 +2266,18 @@ async function sincronizarMeusPedidos() {
       if (JSON.stringify(n) !== JSON.stringify(p)) mudou = true;
       return n;
     });
-    if (!mudou) return;
-    gravarPedidosLocais(novos);
-    renderMeusPedidos();
-    if (ui.modo === 'publico' && $('#area-grade')) { renderGrade(false); }
-    if (ui.folha === 'pagamento' && ui.pedidoAberto) {
-      const p = novos.find(x => x && x.codigo === ui.pedidoAberto);
-      if (p && situacaoDe(p) !== ui.pedidoAbertoSit) abrirPagamento(p);
+    if (mudou) {
+      gravarPedidosLocais(novos);
+      renderMeusPedidos();
+      if (ui.modo === 'publico' && $('#area-grade')) { renderGrade(false); }
+      if (ui.folha === 'pagamento' && ui.pedidoAberto) {
+        const p = novos.find(x => x && x.codigo === ui.pedidoAberto);
+        if (p && situacaoDe(p) !== ui.pedidoAbertoSit && !pedidoExpirou(p)) abrirPagamento(p);
+      }
     }
   } catch (e) { /* tenta de novo depois */ }
   finally { sincronizando = false; }
+  verificarAvisos();
 }
 function temPedidoEsperando() { return lerPedidosLocais().some(p => pedidoVisivel(p) && (situacaoDe(p) === 'aguardando' || situacaoDe(p) === 'comprovante')); }
 if (TEM_SB && PAGINA === 'publico') {
@@ -2468,6 +2475,165 @@ function htmlLegendaPub() {
     '<span><i class="amostra res"></i>Reservado</span><span><i class="amostra ocupado"></i>Vendido</span>';
 }
 function atualizarLegendaPub() { const l = $('#legenda-pub'); if (l) l.innerHTML = htmlLegendaPub(); }
+
+
+/* =====================================================================
+   "Meus pedidos": botão de pessoinha no topo, entrar com WhatsApp +
+   código em outro aparelho, e aviso quando um pedido expira ou é cancelado
+   ===================================================================== */
+const ICONE_PESSOA = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="8.2" r="4.2" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M4.2 20.4c.9-4 4.1-6.1 7.8-6.1s6.9 2.1 7.8 6.1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+function pedidosDaConta() { return lerPedidosLocais().filter(pedidoVisivel); }
+function htmlBotaoConta() {
+  if (!TEM_SB || PAGINA !== 'publico') return '';
+  const n = pedidosDaConta().length;
+  return '<button class="btn-conta" type="button" data-acao="conta" aria-label="Meus pedidos' + (n ? ' (' + n + ')' : '') + '">' + ICONE_PESSOA +
+    '<span class="conta-badge"' + (n ? '' : ' hidden') + '>' + n + '</span></button>';
+}
+function atualizarBotaoConta() {
+  const b = $('.btn-conta'); if (!b) return;
+  const n = pedidosDaConta().length, s = b.querySelector('.conta-badge');
+  if (s) { s.textContent = n; s.hidden = !n; }
+  b.setAttribute('aria-label', 'Meus pedidos' + (n ? ' (' + n + ')' : ''));
+}
+
+function abrirConta(msgOk) {
+  const ps = pedidosDaConta();
+  abrirFolha('conta',
+    '<div class="folha-cab">' + cabFolha('Meus pedidos') +
+      '<p class="dica">' + (ps.length ? 'Os pedidos que você fez neste aparelho.' : 'Você ainda não tem pedidos neste aparelho.') + '</p></div>' +
+    '<div class="folha-corpo conta">' +
+      (msgOk ? '<p class="conta-ok" role="status">' + esc(msgOk) + '</p>' : '') +
+      (ps.length ? htmlMeusPedidos() : '') +
+      '<form id="f-conta" class="conta-form" novalidate>' +
+        '<h3>Fez pedido em outro celular ou computador?</h3>' +
+        '<p class="dica">Coloque o seu WhatsApp e o código de um dos pedidos (4 letras e números, tipo K7P2). O código aparece na tela do Pix e na mensagem do pedido.</p>' +
+        '<div class="campo"><label for="c-fone">Seu WhatsApp, com DDD</label><input id="c-fone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(41) 99999-0000" value="' + esc(ui.foneComprador || '') + '"></div>' +
+        '<div class="campo"><label for="c-cod">Código do pedido</label><input id="c-cod" type="text" maxlength="6" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="K7P2"></div>' +
+        '<p class="erro" id="c-erro" role="alert" hidden></p>' +
+        '<button class="btn primario largo" type="submit" id="c-ok">Ver meus pedidos</button>' +
+      '</form>' +
+      (ps.length ? '<p class="dica conta-sair">Este aparelho não é seu? <button class="link" type="button" data-acao="esquecer-pedidos" id="c-esquecer">Tirar meus pedidos daqui</button></p>' : '') +
+    '</div>');
+  $('#f-conta').addEventListener('submit', e => { e.preventDefault(); entrarConta(); });
+}
+
+async function entrarConta() {
+  const err = $('#c-erro'), bt = $('#c-ok');
+  const mostra = m => { err.textContent = m; err.hidden = !m; };
+  let fone = soDigitos($('#c-fone').value);
+  if (/^55\d{10,11}$/.test(fone)) fone = fone.slice(2);
+  const cod = ($('#c-cod').value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!/^\d{10,11}$/.test(fone)) { mostra('Confira o WhatsApp: coloque o DDD e o número, como (41) 99999-0000.'); $('#c-fone').focus(); return; }
+  if (cod.length < 4) { mostra('Coloque o código do pedido, com 4 letras e números (tipo K7P2).'); $('#c-cod').focus(); return; }
+  mostra(''); bt.disabled = true; bt.textContent = 'Procurando…';
+  let lista = null;
+  try {
+    const r = await fetch(SB_CFG.url.replace(/\/+$/, '') + '/rest/v1/rpc/pedidos_do_whatsapp', {
+      method: 'POST', cache: 'no-store',
+      headers: { apikey: SB_CFG.chave, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ p_telefone: fone, p_codigo: cod })
+    });
+    if (r.ok) lista = await r.json();
+  } catch (e) { lista = null; }
+  bt.disabled = false; bt.textContent = 'Ver meus pedidos';
+  if (!Array.isArray(lista)) { mostra('Não consegui procurar agora. Confira a internet e tente de novo.'); return; }
+  const validos = lista.filter(s => s.situacao === 'comprovante' || s.situacao === 'pago' || (s.situacao === 'aguardando' && Date.parse(s.prazo) > Date.now()));
+  if (!lista.length) { mostra('Não achei pedido com esse WhatsApp e esse código. Confira os dois (o código está na tela do Pix e na mensagem do pedido).'); return; }
+  if (!validos.length) { mostra('Achei, mas esses pedidos já venceram ou foram cancelados. Que tal fazer um novo? 😊'); return; }
+  const locais = lerPedidosLocais().filter(p => p && p.codigo);
+  const porCod = new Map(locais.map(p => [p.codigo, p]));
+  validos.forEach(s => {
+    porCod.set(s.codigo, Object.assign({}, porCod.get(s.codigo) || {}, {
+      codigo: s.codigo, nome: (porCod.get(s.codigo) || {}).nome || s.nome || '', fone,
+      numeros: (s.numeros || []).map(Number), prazo: s.prazo || (porCod.get(s.codigo) || {}).prazo || new Date(Date.now() + 86400000).toISOString(),
+      criado: s.criado, situacao: s.situacao, pagoEm: s.pago_em || null, comprovanteEm: s.comprovante_em || null,
+      bilhete: !!s.bilhete, enviado: s.situacao !== 'aguardando'
+    }));
+  });
+  gravarPedidosLocais(Array.from(porCod.values()).sort((a, b) => String(a.criado || '').localeCompare(String(b.criado || ''))));
+  if (!ui.nomeComprador && validos[0].nome) ui.nomeComprador = validos[0].nome;
+  if (!ui.foneComprador) ui.foneComprador = foneBonito(fone);
+  renderMeusPedidos();
+  if (ui.modo === 'publico' && $('#area-grade')) renderGrade(false);
+  abrirConta(validos.length === 1 ? 'Pronto! Achei 1 pedido e ele já aparece aqui.' : 'Pronto! Achei ' + validos.length + ' pedidos e eles já aparecem aqui.');
+}
+
+function esquecerPedidos(bt) {
+  if (!bt.dataset.confirma) { bt.dataset.confirma = '1'; bt.textContent = 'Toque de novo pra confirmar'; return; }
+  gravarPedidosLocais([]);
+  renderMeusPedidos();
+  if (ui.modo === 'publico' && $('#area-grade')) renderGrade(false);
+  abrirConta('Prontinho: seus pedidos saíram deste aparelho. Eles continuam guardados comigo.');
+}
+
+/* ---------- pedido que venceu ou foi cancelado: some da lista e avisa com carinho ---------- */
+function pedidoExpirou(p) {
+  const s = situacaoDe(p);
+  return s === 'liberado' || s === 'sumiu' || (s === 'aguardando' && Date.parse(p.prazo) < Date.now());
+}
+let avisando = false;
+async function verificarAvisos() {
+  if (!TEM_SB || avisando || ui.modo !== 'publico' || ui.folha) return;
+  const p = lerPedidosLocais().find(x => x && x.codigo && x.fone && pedidoExpirou(x));
+  if (!p) return;
+  avisando = true;
+  try {
+    await buscarEstadoSB();
+    if (ui.folha) return;
+    gravarPedidosLocais(lerPedidosLocais().filter(x => !(x && x.codigo === p.codigo)));
+    if (p.nome && !ui.nomeComprador) ui.nomeComprador = p.nome;
+    if (p.fone && !ui.foneComprador) ui.foneComprador = foneBonito(p.fone);
+    renderMeusPedidos();
+    if ($('#area-grade')) renderGrade(false);
+    abrirAvisoPedido(p);
+  } finally { avisando = false; }
+}
+function abrirAvisoPedido(p) {
+  const cancelado = situacaoDe(p) === 'sumiu';
+  const nums = ordenar(p.numeros || []);
+  /* ainda sem liberar no sistema (vence a cada 10 min): os números dele contam como livres */
+  const livres = nums.filter(n => UNI_SET.has(n) && (situacaoDe(p) === 'aguardando' || !ocupadosPub.has(n)));
+  const foram = nums.filter(n => !livres.includes(n));
+  const um = nums.length === 1;
+  let disp, botao;
+  if (livres.length && !foram.length) {
+    disp = 'Boa notícia: ' + (um ? 'o ' + nums[0] + ' continua livre!' : 'os números ' + listaNums(nums) + ' continuam livres!') + ' Quer reservar de novo?';
+    botao = um ? 'Reservar o mesmo número de novo' : 'Reservar os mesmos números de novo';
+  } else if (livres.length) {
+    disp = (livres.length === 1 ? 'O ' + livres[0] + ' ainda está livre' : 'Os números ' + listaNums(livres) + ' ainda estão livres') + ', mas ' +
+      (foram.length === 1 ? 'o ' + foram[0] + ' já foi pra outra pessoa.' : listaNums(foram) + ' já foram pra outras pessoas.');
+    botao = livres.length === 1 ? 'Reservar o que ainda está livre' : 'Reservar os que ainda estão livres';
+  } else {
+    disp = (um ? 'Esse número já foi' : 'Esses números já foram') + ' pra outra pessoa, mas ainda tem vários livres esperando por você! 🍀';
+    botao = '';
+  }
+  const wa = cfg.whatsapp ? linkWa(cfg.whatsapp, cancelado
+    ? 'Oi, ' + cfg.vendedora + '! Meu pedido ' + p.codigo + ' da rifa apareceu como cancelado. Pode me ajudar?'
+    : 'Oi, ' + cfg.vendedora + '! Meu pedido ' + p.codigo + ' da rifa expirou, mas eu já tinha pago. Pode conferir?') : '';
+  abrirFolha('aviso-pedido',
+    '<div class="folha-cab">' + cabFolha(cancelado ? 'Poxa, seu pedido foi cancelado 😕' : 'Poxa, seu pedido expirou 😕') + '</div>' +
+    '<div class="folha-corpo aviso-pedido">' +
+      '<p>' + (cancelado
+        ? 'O pedido <strong>' + esc(p.codigo) + '</strong> (' + esc(listaNums(nums)) + ') foi cancelado e ' + (um ? 'o número voltou' : 'os números voltaram') + ' pra venda. Se foi engano, me chama no WhatsApp que a gente resolve rapidinho.'
+        : 'O pedido <strong>' + esc(p.codigo) + '</strong> (' + esc(listaNums(nums)) + ') não teve o comprovante anexado dentro do prazo de ' + esc(prazoTexto()) + ', então ' + (um ? 'o número voltou' : 'os números voltaram') + ' pra venda.') + '</p>' +
+      '<p class="nota">Não deu erro nenhum, tá? Dá pra fazer um pedido novo agora mesmo. ' + disp + '</p>' +
+      (botao ? '<button class="btn primario largo" type="button" data-acao="aviso-mesmos" data-nums="' + livres.join(',') + '">' + botao + '</button>' : '') +
+      '<button class="btn largo" type="button" data-acao="aviso-outros">' + (botao ? 'Escolher outros números' : 'Escolher outros números') + '</button>' +
+      (wa ? '<p class="dica">' + (cancelado ? 'Ficou alguma dúvida? ' : 'Já tinha pago? ') + '<a class="link" href="' + esc(wa) + '" target="_blank" rel="noopener">Me chama no WhatsApp</a></p>' : '') +
+    '</div>');
+}
+function reservarDeNovo(lista) {
+  const nums = String(lista || '').split(',').map(Number).filter(n => UNI_SET.has(n));
+  fecharFolha();
+  ui.sel.clear(); nums.slice(0, MAX_POR_PEDIDO).forEach(n => ui.sel.add(n));
+  if ($('#area-grade')) renderGrade(false);
+  renderBarra();
+  abrirPedido();
+}
+function irEscolherOutros() {
+  fecharFolha();
+  const s = $('#escolha'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 /* ---------- início ---------- */
 criarCamadas();

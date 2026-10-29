@@ -490,3 +490,17 @@ label.anexar.enviando{opacity:.7;cursor:progress;pointer-events:none}
 /* ---------- minhas reservas (só pra quem reservou) ---------- */
 .cel.minha-res{background:color-mix(in srgb,var(--c2) 28%,var(--surface));border:2px solid var(--c2);color:var(--ink);box-shadow:0 3px 0 color-mix(in srgb,var(--c2) 70%,#000);cursor:default}
 .amostra.minha-res{background:color-mix(in srgb,var(--c2) 28%,var(--surface));border:2px solid var(--c2)}
+/* ---------- botão "Meus pedidos" (pessoinha) e aviso de pedido vencido ---------- */
+.btn-conta{position:absolute;z-index:3;top:28px;right:max(16px,env(safe-area-inset-right,0px));width:44px;height:44px;border-radius:50%;display:grid;place-items:center;
+  background:color-mix(in srgb,var(--hero-ink) 12%,transparent);color:var(--hero-ink);border:1.5px solid color-mix(in srgb,var(--hero-ink) 60%,transparent);cursor:pointer;padding:0}
+.btn-conta:hover{background:color-mix(in srgb,var(--hero-ink) 20%,transparent)}
+.btn-conta:focus-visible{outline:3px solid var(--c5);outline-offset:3px}
+.conta-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--c5);color:var(--on-c);font:800 .72rem/20px var(--f-display);text-align:center}
+.hero .selo{margin-right:56px}
+.conta .meus-pedidos{margin:0}
+.conta-form{display:grid;gap:12px;padding:16px;border-radius:16px;background:var(--surface-2)}
+.conta-form h3{margin:0;font-size:1.05rem}
+.conta-form .dica{margin:0}
+.conta-ok{margin:0;padding:10px 14px;border-radius:12px;background:var(--ok-soft);color:var(--ink);font-weight:600}
+.conta-sair{margin:0;text-align:center}
+.aviso-pedido p{margin:0}
