@@ -425,7 +425,7 @@ main>section:not(.banda)+section.banda{margin-top:22px}
 .rodape a.btn{--face:var(--btn2);--edge:var(--b-borda)}
 .banda-verde>.wrap.secao{padding-bottom:26px}
 /* ---------- prêmios em cartões de vidro ---------- */
-.carrossel{position:relative;isolation:isolate;-webkit-mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent)}
+.carrossel{padding-bottom:14px;margin-bottom:-14px;position:relative;isolation:isolate;-webkit-mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent)}
 .carrossel::before{content:"";position:absolute;inset:4% max(4%,calc(50% - 250px)) 24%;z-index:-1;pointer-events:none;filter:blur(26px);opacity:.6;
   background:radial-gradient(closest-side at 22% 45%,var(--c5),transparent),radial-gradient(closest-side at 55% 55%,var(--c2),transparent),radial-gradient(closest-side at 82% 40%,var(--c6),transparent)}
 .slide{background:var(--cor);background:color-mix(in srgb,var(--cor) 62%,rgba(255,255,255,.18));-webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5);
