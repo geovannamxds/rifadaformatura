@@ -453,7 +453,7 @@ function renderPublico() {
       '<div class="ferramentas"><form id="f-busca" class="busca" role="search"><label for="busca-num" class="sr">Procurar número</label><input id="busca-num" type="text" inputmode="numeric" autocomplete="off" placeholder="Procurar um número"><button class="btn peq" type="submit">Procurar</button></form>' +
       '<button class="btn peq" type="button" data-acao="sorte">Escolher pra mim</button></div>' +
       '<div id="area-grade"></div>' +
-      '<div class="legenda"><span><i class="amostra"></i>Livre</span><span><i class="amostra sel"></i>Escolhido por você</span>' + (TEM_SB && pedidosAtivos().length ? '<span><i class="amostra meu"></i>Seus números</span>' : '') + '<span><i class="amostra res"></i>Reservado</span><span><i class="amostra ocupado"></i>Vendido</span></div>';
+      '<div class="legenda" id="legenda-pub">' + htmlLegendaPub() + '</div>';
   }
   const linhaLivres = aberta
     ? '<p class="dica" id="linha-livres">' + (cfg.mostrarContador ? livres + ' de ' + total + ' números ainda livres. ' : 'Os números riscados já têm dono. ') + (atualizadoPub ? 'Atualizado em ' + fmtQuando(atualizadoPub) + '.' : '') + '</p>'
@@ -526,9 +526,9 @@ function celHTML(n, admin, mapa) {
     st = v ? (v.pago ? 'pago' : 'aguardando') : (ui.sel.has(n) ? 'sel' : 'livre');
     if (v) extra = ', ' + (v.pago ? 'pago' : 'aguardando pagamento') + ', ' + (v.nome || '');
   } else {
-    st = ui.sel.has(n) ? 'sel' : (ocupadosPub.has(n) ? ((TEM_SB && pedidoDoNumero(n)) ? 'meu' : (reservadosPub.has(n) ? 'res' : 'ocupado')) : 'livre');
+    st = ui.sel.has(n) ? 'sel' : (ocupadosPub.has(n) ? (meuEstado(n) || (reservadosPub.has(n) ? 'res' : 'ocupado')) : 'livre');
   }
-  const rot = 'Número ' + n + (st === 'ocupado' ? ', vendido' : st === 'res' ? ', reservado pra outra pessoa' : st === 'meu' ? ', seu' : st === 'sel' ? ', escolhido' : '') + extra;
+  const rot = 'Número ' + n + (st === 'ocupado' ? ', vendido' : st === 'res' ? ', reservado pra outra pessoa' : st === 'minha-res' ? ', sua reserva, esperando a confirmação do pagamento' : st === 'meu' ? ', seu, pagamento confirmado' : st === 'sel' ? ', escolhido' : '') + extra;
   return '<button type="button" class="cel ' + st + (ui.destaque === n ? ' pisca' : '') + '" data-n="' + n + '" aria-pressed="' + (st === 'sel') + '" aria-label="' + esc(rot) + '"' + ((st === 'ocupado' || st === 'res') ? ' aria-disabled="true"' : '') + '>' + n + '</button>';
 }
 function renderGrade(admin) {
@@ -1181,7 +1181,7 @@ function tocarNumero(n) {
     if (v) { abrirVenda(v); return; }
   } else {
     const meu = TEM_SB ? pedidoDoNumero(n) : null;
-    if (meu) { toast('O ' + n + ' está reservado pra você (pedido ' + meu.codigo + ').'); return; }
+    if (meu) { toast(situacaoDe(meu) === 'pago' ? 'O ' + n + ' é seu! Pagamento confirmado ✅' : 'O ' + n + ' está reservado pra você (pedido ' + meu.codigo + '). Ele fica verdinho assim que eu confirmar o pagamento.'); return; }
     if (ocupadosPub.has(n)) { toast(textoOcupado(n)); return; }
     if (!cfg.pronto || vendasEncerradas() || cfg.pausado) return;
     if (TEM_SB && !ui.sel.has(n) && ui.sel.size >= MAX_POR_PEDIDO) { toast('Cada pedido vai até ' + MAX_POR_PEDIDO + ' números. Finalize este e faça outro depois.'); return; }
@@ -1566,7 +1566,7 @@ function htmlMeusPedidos() {
 function msgSemReserva(nums) {
   return 'Oi, ' + cfg.vendedora + '! Tentei reservar pela página os números ' + listaNums(nums) + ', mas não consegui. Pode reservar pra mim? 😊';
 }
-function renderMeusPedidos() { const el = $('#meus-pedidos'); if (el) el.innerHTML = htmlMeusPedidos(); }
+function renderMeusPedidos() { const el = $('#meus-pedidos'); if (el) el.innerHTML = htmlMeusPedidos(); atualizarLegendaPub(); }
 
 function abrirPedido() {
   if (TEM_SB && !ui.pedidoPeloWhats) abrirCheckout(); else abrirPedidoWhats();
@@ -2448,6 +2448,26 @@ function pularBoneco(el) {
   el.classList.remove('pula'); void el.offsetWidth; el.classList.add('pula');
   clearTimeout(el._pula); el._pula = setTimeout(() => el.classList.remove('pula'), 1000);
 }
+
+
+/* =====================================================================
+   Números do próprio comprador: "Minhas reservas" enquanto a Geo não
+   confirma; verdinho ("Meus números") depois do pagamento confirmado
+   ===================================================================== */
+function meuEstado(n) {
+  if (!TEM_SB) return null;
+  const p = pedidoDoNumero(n);
+  return p ? (situacaoDe(p) === 'pago' ? 'meu' : 'minha-res') : null;
+}
+function htmlLegendaPub() {
+  const ps = TEM_SB ? pedidosAtivos() : [];
+  const minhas = ps.some(p => situacaoDe(p) !== 'pago'), pagos = ps.some(p => situacaoDe(p) === 'pago');
+  return '<span><i class="amostra"></i>Livre</span><span><i class="amostra sel"></i>Escolhido por você</span>' +
+    (minhas ? '<span><i class="amostra minha-res"></i>Minhas reservas</span>' : '') +
+    (pagos ? '<span><i class="amostra meu"></i>Meus números</span>' : '') +
+    '<span><i class="amostra res"></i>Reservado</span><span><i class="amostra ocupado"></i>Vendido</span>';
+}
+function atualizarLegendaPub() { const l = $('#legenda-pub'); if (l) l.innerHTML = htmlLegendaPub(); }
 
 /* ---------- início ---------- */
 criarCamadas();

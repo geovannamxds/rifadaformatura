@@ -487,3 +487,6 @@ label.anexar.enviando{opacity:.7;cursor:progress;pointer-events:none}
   .hero .wrap>*{grid-column:1}
   .hero .wrap>.boneco-geo{grid-column:2;grid-row:1 / span 8;align-self:end;width:330px;margin-bottom:-44px}
 }
+/* ---------- minhas reservas (só pra quem reservou) ---------- */
+.cel.minha-res{background:color-mix(in srgb,var(--c2) 28%,var(--surface));border:2px solid var(--c2);color:var(--ink);box-shadow:0 3px 0 color-mix(in srgb,var(--c2) 70%,#000);cursor:default}
+.amostra.minha-res{background:color-mix(in srgb,var(--c2) 28%,var(--surface));border:2px solid var(--c2)}
