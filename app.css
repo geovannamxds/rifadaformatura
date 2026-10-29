@@ -535,3 +535,10 @@ label.anexar.enviando{opacity:.7;cursor:progress;pointer-events:none}
 .passo-qtd .btn.qtd:focus-visible::after{opacity:1;visibility:visible;transform:translate(-50%,0);transition-delay:0s}
 @media (prefers-reduced-motion:reduce){.btn-conta::after,.passo-qtd .btn.qtd::after{transition:none}}
 .toast{width:max-content}
+.pilula.mostarda{display:inline-block}
+.pilula.mostarda a{white-space:nowrap}
+.duvidas span{display:inline-block;max-width:12em;overflow:hidden;white-space:nowrap;transition:max-width .25s ease,opacity .2s ease}
+.duvidas.mini{gap:0;padding:12px}
+.duvidas.mini span{max-width:0;opacity:0}
+@media (prefers-reduced-motion:reduce){.duvidas span{transition:none}}
+@media (max-width:360px){.selo{letter-spacing:.08em;padding:6px 12px}}

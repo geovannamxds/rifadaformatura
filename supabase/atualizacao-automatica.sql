@@ -15,3 +15,9 @@ select cron.schedule(
 
 -- Confira: as três rotinas ligadas
 select jobname as "Rotina", schedule as "Quando", active as "Ligada" from cron.job order by jobname;
+
+-- Funções de gatilho não podem ser chamadas pela internet (só rodam sozinhas, quando uma venda muda)
+revoke execute on function public.vendas_para_planilha() from public, anon, authenticated;
+revoke execute on function public.vendas_marcar_mudanca() from public, anon, authenticated;
+revoke execute on function public.vendas_checar_numeros() from public, anon, authenticated;
+revoke execute on function public.config_carimbo() from public, anon, authenticated;

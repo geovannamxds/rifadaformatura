@@ -220,7 +220,13 @@ function msgPedido(nome, nums, codigo) {
   return preencher(tpl, Object.assign(varsVenda(nome, nums, true), { pedido: codigo || '' }));
 }
 function msgBilhete(v) { return preencher(msgModelo('bilhete'), varsVenda(v.nome, ordenar(v.numeros || []), false)); }
-function msgCobranca(v) { return preencher(msgModelo('cobranca'), Object.assign(varsVenda(v.nome, ordenar(v.numeros || []), false), { prazo: fmtQuando(prazoDe(v).toISOString()) })); }
+function colarEmojis(s) { return String(s).replace(/(\p{Extended_Pictographic}\uFE0F?)\s?(?=\p{Extended_Pictographic})/gu, '$1\u2060'); }
+function msgCobranca(v) {
+  let tpl = String(msgModelo('cobranca'));
+  if (v.semPrazo) tpl = tpl.split('\n').filter(l => !l.includes('{prazo}')).join('\n'); /* "paga depois": não vence */
+  if (!v.codigo) tpl = tpl.replace('é só anexar o comprovante na página da rifa, no aviso “Seu pedido”, ou me mandar aqui', 'é só me mandar o comprovante aqui'); /* venda feita no painel: não tem pedido na página */
+  if ((v.numeros || []).length === 1) tpl = tpl.replace('os números {numeros}', 'o número {numeros}');
+  return preencher(tpl, Object.assign(varsVenda(v.nome, ordenar(v.numeros || []), false), { prazo: fmtQuando(prazoDe(v).toISOString()) })); }
 function semLinkSeVazio(tpl) { return cfg.link ? tpl : String(tpl).split('\n').filter(l => !l.includes('{link}')).join('\n'); }
 function msgDivulgar(daDona) { return preencher(semLinkSeVazio(msgModelo(daDona ? 'divulgar' : 'divulgarAmigos')), varsBase()); }
 
@@ -470,13 +476,13 @@ function renderPublico() {
     '<header class="hero banda"><canvas class="rabiscos" data-preset="hero" aria-hidden="true"></canvas><div class="wrap">' +
       '<span class="selo">' + esc(cfg.edicao) + ' · com a ' + V + '</span>' + htmlBotaoConta() +
       '<h1>' + tituloHTML(cfg.titulo) + '</h1>' + htmlBoneco() +
-      '<p class="lede">' + esc(cfg.subtitulo) + '</p>' +
+      '<p class="lede">' + colarEmojis(esc(cfg.subtitulo)) + '</p>' +
       '<div class="canhoto"><div><span class="rot">Cada número</span><div class="preco num">' + brl(cfg.preco).replace(',00', '') + '</div></div>' +
         '<div class="canhoto-tx">' + (trechos(UNI).length === 1 ? '<span class="rot">Nº</span><span class="num">' + UNI[0] + ' a ' + UNI[UNI.length - 1] + '</span>' : '<span class="rot">Números</span><span class="num">' + UNI.length + ' à venda</span>') + '</div></div>' +
       '<div class="pilulas">' + (temResultado() ? '<a class="pilula mostarda" href="#t-res">🎉 Veja o resultado do sorteio</a>' : '<span class="pilula mostarda">Sorteio ' + dataBR(cfg.sorteio) + ' · ao vivo no ' + igLink() + '</span>' + pilulaVendas) + '</div>' +
       '<div id="progresso-pub">' + htmlProgresso() + '</div>' +
       (aberta ? '<div class="hero-cta"><button class="btn primario" type="button" data-acao="ir-escolha">Escolher meus números</button><button class="btn" type="button" data-acao="compartilhar">Compartilhar</button></div>' : '') +
-      (esgotado ? '<div class="hero-cta"><span class="pilula mostarda">Esgotou! Muito obrigada 💛🎓</span></div>' : '') +
+      (esgotado ? '<div class="hero-cta"><span class="pilula mostarda">Esgotou! Muito obrigada 💛⁠🎓</span></div>' : '') +
     '</div></header>' +
     '<main>' + htmlResultado() +
       '<section class="wrap secao" aria-labelledby="t-premios"><div class="secao-cab"><h2 id="t-premios">Concorra a <em>5 prêmios</em></h2><p class="dica">Cada número sorteado leva um. Arraste pro lado pra ver todos os prêmios desta leva! E fica de olho, que logo vem mais por aí 😉</p></div>' + htmlPremios() + '</section>' +
@@ -506,8 +512,8 @@ function renderPublico() {
       '</div></section>' +
       '<section class="banda banda-verde" aria-labelledby="t-ajude"><canvas class="rabiscos" data-preset="verde" aria-hidden="true"></canvas><div class="wrap secao">' +
         (esgotado
-          ? '<h2 id="t-ajude">Valeu <em>demais</em>!</h2><p>Os números esgotaram. Muito obrigada! 💛🎓</p>'
-          : '<h2 id="t-ajude">Me ajuda a <em>vender</em>?</h2><p>Mandar o link pra família e pros amigos já ajuda muito. Muito obrigada! 💛🎓</p>' +
+          ? '<h2 id="t-ajude">Valeu <em>demais</em>!</h2><p>Os números esgotaram. Muito obrigada! 💛⁠🎓</p>'
+          : '<h2 id="t-ajude">Me ajuda a <em>vender</em>?</h2><p>Mandar o link pra família e pros amigos já ajuda muito. Muito obrigada! 💛⁠🎓</p>' +
             '<div class="linha-botoes"><a class="btn primario" href="' + esc('https://api.whatsapp.com/send?text=' + encodeURIComponent(msgDivulgar(false))) + '" target="_blank" rel="noopener">Mandar no WhatsApp</a>' +
             (cfg.link ? '<button class="btn" type="button" data-copiar="' + esc(cfg.link) + '">Copiar link</button>' : '') + '</div>') +
       '</div></section>' +
@@ -671,7 +677,7 @@ function abrirCompartilhar() {
     '<div class="folha-cab">' + cabFolha(daDona ? 'Divulgar a rifa' : 'Compartilhar') + '</div>' +
     '<div class="folha-corpo">' +
       (cfg.link
-        ? '<div class="campo"><span class="rotulo">Link da página</span><div class="copia"><code>' + esc(cfg.link) + '</code><button class="btn peq" type="button" data-copiar="' + esc(cfg.link) + '">Copiar</button></div></div>'
+        ? '<div class="campo"><span class="rotulo">Link da página</span><div class="copia"><code>' + esc(String(cfg.link).replace(/^https?:\/\//, '')) + '</code><button class="btn peq" type="button" data-copiar="' + esc(cfg.link) + '">Copiar</button></div></div>'
         : '<p class="dica">O link aparece aqui assim que a página estiver publicada.</p>') +
       '<div class="campo"><span class="rotulo">Mensagem pronta</span><p class="nota">' + esc(texto).replace(/\n/g, '<br>') + '</p></div>' +
       '<div class="linha-botoes"><a class="btn primario" href="' + esc('https://api.whatsapp.com/send?text=' + encodeURIComponent(texto)) + '" target="_blank" rel="noopener">Mandar no WhatsApp</a><button class="btn" type="button" data-copiar="' + esc(texto) + '">Copiar mensagem</button></div>' +
@@ -684,7 +690,7 @@ function renderAdmin() {
   $('#app').innerHTML =
     '<div class="wrap adm">' +
       '<header class="adm-cab"><div><p class="rot">Painel da vendedora · só você vê</p><h1>' + esc(cfg.titulo) + '</h1></div>' +
-      '<div class="adm-acoes"><button class="btn peq" type="button" data-acao="ver-pub">Ver como comprador</button><button class="btn peq" type="button" data-acao="compartilhar">Divulgar</button>' + (cfg.pausado ? '<button class="btn peq ok" type="button" data-acao="retomar">▶ Retomar vendas</button>' : '<button class="btn peq" type="button" data-acao="pausar">⏸ Pausar vendas</button>') + (SB ? '<button class="btn peq fantasma" type="button" data-acao="sair">Sair</button>' : '') + '</div></header>' +
+      '<div class="adm-acoes"><button class="btn peq" type="button" data-acao="ver-pub">Ver como comprador</button><button class="btn peq" type="button" data-acao="compartilhar">Divulgar</button>' + (cfg.pausado ? '<button class="btn peq ok" type="button" data-acao="retomar">▶️ Retomar vendas</button>' : '<button class="btn peq" type="button" data-acao="pausar">⏸️ Pausar vendas</button>') + (SB ? '<button class="btn peq fantasma" type="button" data-acao="sair">Sair</button>' : '') + '</div></header>' +
       '<div id="avisos"></div>' +
       '<section id="resumo" class="resumo" aria-label="Resumo das vendas"></section>' +
       '<details class="prazos"><summary>Prazos da Formô</summary><ul>' +
@@ -818,8 +824,10 @@ function cardVenda(v) {
   if (!v.pago) {
     acoes += '<button class="btn peq ok" type="button" data-acao="marcar-pago" data-venda="' + esc(v.id) + '">Marcar como pago</button>' +
       (venc ? '<button class="btn peq perigo" type="button" data-acao="liberar" data-venda="' + esc(v.id) + '">Liberar números</button>' : '') +
-      '<a class="btn peq" href="' + esc(linkWa(v.telefone, msgCobranca(v))) + '" target="_blank" rel="noopener">Cobrar no WhatsApp</a>' +
-      (pixCopiaECola(nums.length * cfg.preco, v) ? '<button class="btn peq" type="button" data-copiar="' + esc(pixCopiaECola(nums.length * cfg.preco, v)) + '">Copiar Pix desta venda</button>' : '');
+      (v.comprovanteEm
+        ? (v.telefone ? '<a class="btn peq" href="' + esc(linkWa(v.telefone, 'Oi, ' + (primeiroNome(v.nome) || '') + '! ')) + '" target="_blank" rel="noopener">Abrir conversa</a>' : '')
+        : '<a class="btn peq" href="' + esc(linkWa(v.telefone, msgCobranca(v))) + '" target="_blank" rel="noopener">Cobrar no WhatsApp</a>' +
+          (pixCopiaECola(nums.length * cfg.preco, v) ? '<button class="btn peq" type="button" data-copiar="' + esc(pixCopiaECola(nums.length * cfg.preco, v)) + '">Copiar Pix desta venda</button>' : ''));
   } else if (!v.bilhete) {
     acoes += '<button class="btn peq primario" type="button" data-acao="enviar-bilhete" data-venda="' + esc(v.id) + '">Mandar bilhete no WhatsApp</button>' +
       '<button class="btn peq" type="button" data-acao="marcar-bilhete" data-venda="' + esc(v.id) + '">Já mandei o bilhete</button>';
@@ -1921,13 +1929,21 @@ function atualizarBotaoDuvidas() {
   if (!b) {
     if (!mostrar) return;
     b = document.createElement('a');
-    b.id = 'duvidas'; b.className = 'duvidas'; b.target = '_blank'; b.rel = 'noopener';
+    b.id = 'duvidas'; b.className = 'duvidas'; b.target = '_blank'; b.rel = 'noopener'; b.setAttribute('aria-label', 'Dúvidas? Fala comigo no WhatsApp');
     b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.2 3.6c-.5.4-1.3.1-1.3-.6V16A2.5 2.5 0 0 1 4 13.5z" fill="currentColor"/><circle cx="8.5" cy="9.5" r="1.2" style="fill:var(--c5)"/><circle cx="12" cy="9.5" r="1.2" style="fill:var(--c5)"/><circle cx="15.5" cy="9.5" r="1.2" style="fill:var(--c5)"/></svg><span>Dúvidas? Fala comigo</span>';
     document.body.appendChild(b);
   }
   b.href = linkDuvidas();
   b.hidden = !mostrar;
+  encolherDuvidas();
 }
+/* depois do topo, o "Dúvidas?" vira só a bolinha, pra não cobrir os números */
+function encolherDuvidas() {
+  const b = $('#duvidas'); if (!b) return;
+  const hero = $('.hero');
+  b.classList.toggle('mini', !!hero && hero.getBoundingClientRect().bottom < 40);
+}
+window.addEventListener('scroll', () => { if (!encolherDuvidas.p) { encolherDuvidas.p = true; requestAnimationFrame(() => { encolherDuvidas.p = false; encolherDuvidas(); }); } }, { passive: true });
 
 
 /* =====================================================================
