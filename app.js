@@ -468,7 +468,7 @@ function renderPublico() {
     (ui.ehDona ? '<div class="faixa-dona"><span>Você está vendo a página como o comprador vê.</span><button class="btn peq" type="button" data-acao="painel">Voltar ao painel</button></div>' : '') +
     '<header class="hero banda"><canvas class="rabiscos" data-preset="hero" aria-hidden="true"></canvas><div class="wrap">' +
       '<span class="selo">' + esc(cfg.edicao) + ' · com a ' + V + '</span>' +
-      '<h1>' + tituloHTML(cfg.titulo) + '</h1>' +
+      '<h1>' + tituloHTML(cfg.titulo) + '</h1>' + htmlBoneco() +
       '<p class="lede">' + esc(cfg.subtitulo) + '</p>' +
       '<div class="canhoto"><div><span class="rot">Cada número</span><div class="preco num">' + brl(cfg.preco).replace(',00', '') + '</div></div>' +
         '<div class="canhoto-tx">' + (trechos(UNI).length === 1 ? '<span class="rot">Nº</span><span class="num">' + UNI[0] + ' a ' + UNI[UNI.length - 1] + '</span>' : '<span class="rot">Números</span><span class="num">' + UNI.length + ' à venda</span>') + '</div></div>' +
@@ -1135,6 +1135,7 @@ document.addEventListener('click', e => {
     case 'csv': baixarCSV(); break;
     case 'pausar': abrirPausa(); break;
     case 'enviar-bilhete': abrirEnvioBilhete(id); break;
+    case 'boneco': pularBoneco(t); break;
     case 'ver-comprovante': abrirComprovantes(id); break;
     case 'comp-pago': fecharFolha(); atualizarVenda(id, { pago: true, pagoEm: new Date().toISOString() }, 'Marcado como pago'); break;
     case 'ver-conferir': ui.aba = 'vendas'; ui.filtro = 'conferir'; renderAba(); { const l = $('#lista'); if (l) l.scrollIntoView({ block: 'start' }); } break;
@@ -2429,6 +2430,23 @@ async function abrirComprovantes(id) {
   } catch (e) {
     const el = $('#comp-lista'); if (el && ui.folha === 'comprovante') el.innerHTML = '<p class="dica erro">Não consegui abrir o comprovante agora. Feche e tente de novo.</p>';
   }
+}
+
+
+/* =====================================================================
+   Bonequinho da Geo no topo: balança sozinho e dá um pulinho no toque
+   ===================================================================== */
+/* desligado até a Geo aprovar a prévia (artefato "Prévia da Rifa") */
+const MOSTRAR_BONECO = false;
+function htmlBoneco() {
+  if (!MOSTRAR_BONECO) return '';
+  return '<figure class="boneco-geo" data-acao="boneco"><span class="boneco-sol" aria-hidden="true"></span>' +
+    '<div class="boneco-corpo"><img src="' + RAIZ + 'img/geo-boneco.webp" alt="Geo, de blusa vermelha, sorrindo" width="616" height="784" decoding="async"></div></figure>';
+}
+function pularBoneco(el) {
+  if (!el) return;
+  el.classList.remove('pula'); void el.offsetWidth; el.classList.add('pula');
+  clearTimeout(el._pula); el._pula = setTimeout(() => el.classList.remove('pula'), 1000);
 }
 
 /* ---------- início ---------- */
