@@ -303,6 +303,7 @@ let toastTimer = null;
 function toast(msg) {
   const t = $('#toast'); if (!t) return;
   t.textContent = msg; t.hidden = false;
+  const b = $('#barra'); t.style.bottom = b && !b.hidden && b.offsetHeight ? (b.offsetHeight + 14) + 'px' : '';
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3200);
 }
 function selecionarCampo(el) {
@@ -489,7 +490,7 @@ function renderPublico() {
             '<li><span class="bola">2</span><strong>Pague por Pix</strong><span>A chave, o código e o QR Code aparecem com o valor certinho quando você tocar em Continuar.</span></li>' +
             '<li><span class="bola">3</span><strong>Mande o pedido no WhatsApp</strong><span>A mensagem já vai pronta. Manda o comprovante na mesma conversa.</span></li>') +
         '<li><span class="bola">4</span><strong>Receba seu bilhete</strong><span>Eu confirmo o pagamento e te mando o bilhete digital de cada número.</span></li>' +
-      '</ol><p class="aviso-reserva">⏳ ' + (TEM_SB ? 'Quando você gera o Pix, os números ficam reservados pra você por ' : 'Depois que você me manda o pedido, eu seguro os números pra você por ') + P + '. ' + (TEM_SB ? 'Se o comprovante não for anexado nesse prazo' : 'Se o pagamento não chegar nesse prazo') + ', eles voltam a ficar livres pra outra pessoa.</p></div></section>' +
+      '</ol><p class="aviso-reserva">⏳ ' + (TEM_SB ? 'Quando você gera o Pix, os números ficam reservados pra você por ' : 'Depois que você me manda o pedido, eu seguro os números pra você por ') + P + '. ' + (TEM_SB ? 'Se não for possível confirmar a compra nesse prazo' : 'Se o pagamento não chegar nesse prazo') + ', eles voltam a ficar livres pra outra pessoa.</p></div></section>' +
       '<section class="banda banda-rosa" aria-labelledby="t-ganhou"><canvas class="rabiscos" data-preset="rosa" aria-hidden="true"></canvas><div class="wrap secao"><div class="secao-cab"><h2 id="t-ganhou">Se o seu número sair</h2><p class="lede-g">São 5 números sorteados, um para cada prêmio.</p></div><ol class="passos-g">' +
         '<li><span class="bola">1</span><strong>Eu te aviso</strong><span>Acompanhe a live no ' + igLink() + '. Se um número seu for sorteado, eu te chamo no WhatsApp que você usou na compra.</span></li>' +
         '<li><span class="bola">2</span><strong>Fale com a Formô</strong><span>Com o aviso em mãos, você entra em contato com a Formô pra confirmar o número e combinar a retirada.</span></li>' +
@@ -562,14 +563,30 @@ function atualizarCel(n) {
   b.setAttribute('aria-pressed', String(sel));
   b.setAttribute('aria-label', 'Número ' + n + (sel ? ', escolhido' : ''));
 }
-function irPara(n) {
+function irPara(n, rolar = true) {
   const i = BLOCOS.findIndex(b => b.nums.includes(n));
   if (i < 0) return;
   ui.bloco = i; ui.destaque = n;
+  const area = $('#area-grade'), antes = area ? area.getBoundingClientRect() : null;
   renderGrade(ui.modo === 'admin');
+  /* a grade estava acima da tela? segura o que a pessoa está vendo no mesmo lugar */
+  if (antes && antes.bottom < 0) { const d = area.getBoundingClientRect().bottom - antes.bottom; if (d) window.scrollBy(0, d); }
   const c = $('.cel[data-n="' + n + '"]');
-  if (c) c.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  if (c && rolar) rolarAteVer(c);
   setTimeout(() => { if (ui.destaque === n) { ui.destaque = null; const e = $('.cel[data-n="' + n + '"]'); if (e) e.classList.remove('pisca'); } }, 2600);
+}
+
+/* rola só o necessário: se a cartela inteira cabe na tela, mostra ela toda e para de mexer */
+function rolarAteVer(cel) {
+  const barra = $('#barra'), bh = barra && !barra.hidden ? barra.offsetHeight : 0;
+  const topo = 16; let base = window.innerHeight - bh - 16;
+  const cart = cel.closest('.cartela');
+  let r = cel.getBoundingClientRect();
+  if (cart) { const rc = cart.getBoundingClientRect(); if (rc.height <= base - topo) { r = rc; if (rc.height <= base - topo - 64) base -= 64; /* sobra lugar pro aviso embaixo */ } }
+  let d = 0;
+  if (r.top < topo) d = r.top - topo;
+  else if (r.bottom > base) d = r.bottom - base;
+  if (d) window.scrollBy({ top: d, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
 /* ---------- barra de seleção ---------- */
@@ -580,9 +597,16 @@ function renderBarra() {
   const mostrar = n > 0 && !ui.folha && (ui.modo === 'publico' || ui.aba === 'numeros');
   if (!mostrar) { el.hidden = true; return; }
   el.hidden = false;
-  el.innerHTML = '<div class="barra-in">' + (ui.modo === 'admin' ? '' : htmlCarrinho(n)) + '<div class="barra-info"><span>' + n + ' ' + plural(n, 'número', 'números') + '</span><span class="num">' + brl(n * cfg.preco) + '</span></div>' +
+  const foco = document.activeElement && el.contains(document.activeElement) ? document.activeElement.dataset.acao : null;
+  const cheio = TEM_SB && n >= MAX_POR_PEDIDO;
+  const passo = ui.modo === 'admin' ? '' : '<div class="passo-qtd" role="group" aria-label="Quantidade de números">' +
+      '<button class="btn peq icone qtd" type="button" data-acao="qtd-menos" aria-label="Tirar o último número escolhido" data-dica="Tirar o último">−</button>' +
+      htmlCarrinho(n) +
+      '<button class="btn peq icone qtd' + (cheio ? ' no-limite' : '') + '" type="button" data-acao="qtd-mais" aria-label="Adicionar um número aleatório" data-dica="' + (cheio ? 'Limite de ' + MAX_POR_PEDIDO + ' por pedido' : 'Mais um, aleatório') + '">+</button></div>';
+  el.innerHTML = '<div class="barra-in">' + passo + '<div class="barra-info"><span>' + n + ' ' + plural(n, 'número', 'números') + '</span><span class="num">' + brl(n * cfg.preco) + '</span></div>' +
     '<div class="barra-acoes"><button class="btn peq fantasma" type="button" data-acao="limpar-sel">Limpar</button>' +
     '<button class="btn primario" type="button" data-acao="continuar">' + (ui.modo === 'admin' ? 'Registrar venda' : 'Fechar pedido') + '</button></div></div>';
+  if (foco) { const b = el.querySelector('[data-acao="' + foco + '"]'); if (b) b.focus({ preventScroll: true }); }
 }
 
 /* ---------- folhas (modais) ---------- */
@@ -1111,6 +1135,8 @@ document.addEventListener('click', e => {
     case 'bloco-ant': ui.bloco--; renderGrade(ui.modo === 'admin'); break;
     case 'bloco-prox': ui.bloco++; renderGrade(ui.modo === 'admin'); break;
     case 'sorte': escolherPraMim(); break;
+    case 'qtd-mais': escolherPraMim(true); break;
+    case 'qtd-menos': tirarUltimo(); break;
     case 'prem-ant': if (irPremio) { pausarCarrossel(); irPremio(irPremio.atual() - 1, true); } break;
     case 'prem-prox': if (irPremio) { pausarCarrossel(); irPremio(irPremio.atual() + 1, true); } break;
     case 'ir-escolha': { const s = $('#escolha'); if (s) s.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); break; }
@@ -1193,13 +1219,20 @@ function tocarNumero(n) {
   if (ui.sel.has(n)) ui.sel.delete(n); else ui.sel.add(n);
   atualizarCel(n); renderBarra();
 }
-function escolherPraMim() {
+function escolherPraMim(doCarrinho) {
   if (ui.modo !== 'admin' && TEM_SB && ui.sel.size >= MAX_POR_PEDIDO) { toast('Cada pedido vai até ' + MAX_POR_PEDIDO + ' números. Finalize este e faça outro depois.'); return; }
   const livres = UNI.filter(n => !estaOcupado(n) && !ui.sel.has(n));
   if (!livres.length) { toast('Não sobrou número livre.'); return; }
   const n = livres[Math.floor(Math.random() * livres.length)];
-  ui.sel.add(n); irPara(n); renderBarra();
+  ui.sel.add(n); renderBarra();
+  irPara(n, !doCarrinho); /* pelo carrinho, a tela não sai do lugar */
   toast('Separei o ' + n + ' pra você!');
+}
+function tirarUltimo() {
+  const n = Array.from(ui.sel).pop();
+  if (n == null) return;
+  ui.sel.delete(n); atualizarCel(n); renderBarra();
+  toast(ui.sel.size ? 'Tirei o ' + n + ' do pedido.' : 'Tirei o ' + n + '. Seu carrinho ficou vazio.');
 }
 
 /* ---------- vendas ao vivo ---------- */
@@ -1598,7 +1631,7 @@ function abrirCheckout(erroMsg, comAlternativa) {
       '<p class="erro" id="p-erro" role="alert"' + (erroMsg ? '' : ' hidden') + '>' + esc(erroMsg || '') + '</p>' +
       (comAlternativa && cfg.whatsapp ? '<p class="dica">Se precisar, <a class="link" href="' + esc(linkWa(cfg.whatsapp, msgSemReserva(nums))) + '" target="_blank" rel="noopener">me chama no WhatsApp</a> que eu vejo com você. Só pague depois que os números estiverem reservados.</p>' : '') +
       '<button class="btn primario largo" type="submit" id="p-reservar">Gerar Pix e reservar</button>' +
-      '<p class="nota">⏳ Quando você gera o Pix, os números ficam reservados pra você por ' + esc(prazoTexto()) + '. Se o comprovante não chegar nesse prazo, eles voltam a ficar livres.<br>📌 Cada WhatsApp pode ter até ' + LIMITE_PEDIDOS_ABERTOS + ' pedidos de até ' + MAX_POR_PEDIDO + ' números esperando a minha confirmação do pagamento.</p>' +
+      '<p class="nota">⏳ Quando você gera o Pix, os números ficam reservados pra você por ' + esc(prazoTexto()) + '. Se não for possível confirmar a compra nesse prazo, eles voltam a ficar livres.<br>📌 Cada WhatsApp pode ter até ' + LIMITE_PEDIDOS_ABERTOS + ' pedidos de até ' + MAX_POR_PEDIDO + ' números esperando a minha confirmação do pagamento.</p>' +
       '<p class="dica lgpd">🔒 Seu nome e seu WhatsApp ficam só comigo, pra confirmar a compra e te mandar o bilhete.</p>' +
     '</form>');
   const nome = $('#p-nome'), fone = $('#p-fone');
@@ -2486,7 +2519,7 @@ function pedidosDaConta() { return lerPedidosLocais().filter(pedidoVisivel); }
 function htmlBotaoConta() {
   if (!TEM_SB || PAGINA !== 'publico') return '';
   const n = pedidosDaConta().length;
-  return '<button class="btn-conta" type="button" data-acao="conta" aria-label="Meus pedidos' + (n ? ' (' + n + ')' : '') + '">' + ICONE_PESSOA +
+  return '<button class="btn-conta" type="button" data-acao="conta" data-dica="Meus pedidos" aria-label="Meus pedidos' + (n ? ' (' + n + ')' : '') + '">' + ICONE_PESSOA +
     '<span class="conta-badge"' + (n ? '' : ' hidden') + '>' + n + '</span></button>';
 }
 function atualizarBotaoConta() {
