@@ -780,8 +780,10 @@ function cardVenda(v) {
       '<a class="btn peq" href="' + esc(linkWa(v.telefone, msgCobranca(v))) + '" target="_blank" rel="noopener">Cobrar no WhatsApp</a>' +
       (pixCopiaECola(nums.length * cfg.preco) ? '<button class="btn peq" type="button" data-copiar="' + esc(pixCopiaECola(nums.length * cfg.preco)) + '">Copiar Pix desta venda</button>' : '');
   } else if (!v.bilhete) {
-    acoes += '<a class="btn peq primario" href="' + esc(linkWa(v.telefone, msgBilhete(v))) + '" target="_blank" rel="noopener" data-acao="abriu-bilhete">Mandar bilhete no WhatsApp</a>' +
+    acoes += '<button class="btn peq primario" type="button" data-acao="enviar-bilhete" data-venda="' + esc(v.id) + '">Mandar bilhete no WhatsApp</button>' +
       '<button class="btn peq" type="button" data-acao="marcar-bilhete" data-venda="' + esc(v.id) + '">Já mandei o bilhete</button>';
+  } else {
+    acoes += '<button class="btn peq" type="button" data-acao="enviar-bilhete" data-venda="' + esc(v.id) + '">Reenviar bilhete</button>';
   }
   acoes += '<button class="btn peq fantasma" type="button" data-acao="editar-venda" data-venda="' + esc(v.id) + '">Editar</button>';
   return '<article class="venda">' +
@@ -1114,6 +1116,10 @@ document.addEventListener('click', e => {
       publicar(null, 'Página dos compradores atualizada'); break;
     case 'csv': baixarCSV(); break;
     case 'pausar': abrirPausa(); break;
+    case 'enviar-bilhete': abrirEnvioBilhete(id); break;
+    case 'bil-lote': mandarLoteBilhetes(Number(t.dataset.lote)); break;
+    case 'bil-tentar': carregarFotosEnvio(); break;
+    case 'bil-pronto': fecharFolha(); atualizarVenda(id, { bilhete: true }, 'Bilhete marcado como enviado'); break;
     case 'retomar': retomarVendas(); break;
     case 'imprimir-lista': imprimirLista(); break;
     case 'ver-pedido': verPedido(t.dataset.codigo); break;
@@ -1988,6 +1994,138 @@ function agendarFundo() {
   }, 120);
 }
 if (window.ResizeObserver) { try { new ResizeObserver(agendarFundo).observe($('#app')); } catch (e) { /* segue sem */ } }
+
+
+/* =====================================================================
+   Fotos dos bilhetes: ficam no site cifradas (pasta bilhetes/) e só o
+   painel, com a dona logada, recebe a chave pra abrir. "Mandar bilhete"
+   abre a conversa com a mensagem pronta e depois manda as fotos certas
+   pelo compartilhar do celular (no computador, baixa as fotos).
+   ===================================================================== */
+const FOTOS_POR_VEZ = 10;
+let chaveBilhetes = null;
+const fotosBilhete = new Map();
+let envio = null;
+
+async function obterChaveBilhetes() {
+  if (chaveBilhetes) return chaveBilhetes;
+  if (!SB) throw new Error('sem_banco');
+  const { data, error } = await SB.rpc('chave_bilhetes');
+  if (error || !data) throw new Error('sem_chave');
+  const bruta = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+  chaveBilhetes = await crypto.subtle.importKey('raw', bruta, 'AES-GCM', false, ['decrypt']);
+  return chaveBilhetes;
+}
+async function fotoBilhete(n) {
+  if (fotosBilhete.has(n)) return fotosBilhete.get(n);
+  const chave = await obterChaveBilhetes();
+  const r = await fetch(RAIZ + 'bilhetes/' + n + '.bin');
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error('rede');
+  const b = new Uint8Array(await r.arrayBuffer());
+  const png = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(0, 12), additionalData: new TextEncoder().encode(String(n)) }, chave, b.slice(12));
+  const arq = new File([png], 'Bilhete ' + n + '.png', { type: 'image/png' });
+  const foto = { arq, url: URL.createObjectURL(arq) };
+  fotosBilhete.set(n, foto);
+  return foto;
+}
+function podeCompartilharFotos() {
+  try { return !!(navigator.canShare && navigator.share && navigator.canShare({ files: [new File([new Uint8Array(8)], 'teste.png', { type: 'image/png' })] })); }
+  catch (e) { return false; }
+}
+
+function abrirEnvioBilhete(id) {
+  const v = vendas.find(x => x.id === id); if (!v) return;
+  const nums = ordenar(v.numeros || []);
+  const nome = primeiroNome(v.nome) || 'a pessoa';
+  envio = { id, nums, fotos: [], faltam: [], token: Date.now() + Math.random(), compartilhou: new Set() };
+  const passoConversa = v.telefone
+    ? '<strong>Abra a conversa</strong><p class="dica">A mensagem de pagamento confirmado já vai escrita. É só enviar.</p>' +
+      '<a class="btn largo" href="' + esc(linkWa(v.telefone, msgBilhete(v))) + '" target="_blank" rel="noopener">Abrir conversa com ' + esc(nome) + '</a>'
+    : '<strong>Sem WhatsApp salvo</strong><p class="dica">Essa venda não tem o WhatsApp da pessoa. Mande as fotos direto pra ela no passo 2, ou toque em Editar na venda pra colocar o número.</p>';
+  abrirFolha('bilhete',
+    '<div class="folha-cab">' + cabFolha(v.bilhete ? 'Mandar o bilhete de novo' : 'Mandar bilhete') +
+      '<p class="dica">' + esc(v.nome || 'Sem nome') + ' · ' + nums.length + (nums.length === 1 ? ' número' : ' números') + '</p></div>' +
+    '<div class="folha-corpo envio-bilhete">' +
+      '<div class="bil-previa" id="bil-previa" aria-live="polite">' + nums.map(n => '<figure class="bil-mini carregando"><span>' + n + '</span></figure>').join('') + '</div>' +
+      '<ol class="bil-passos">' +
+        '<li><span class="bola">1</span><div>' + passoConversa + '</div></li>' +
+        '<li><span class="bola">2</span><div><strong>Mande as fotos</strong><p class="dica" id="bil-dica">' + (podeCompartilharFotos()
+          ? 'Escolha o WhatsApp e toque na conversa ' + (v.telefone ? 'com ' + esc(nome) + ': ela aparece no topo, nas conversas recentes.' : 'da pessoa.')
+          : 'Baixe as fotos e arraste pra conversa no WhatsApp Web.') + '</p><div class="bil-botoes" id="bil-botoes"><button class="btn primario largo" type="button" disabled>Abrindo as fotos…</button></div></div></li>' +
+        (v.bilhete ? '' : '<li><span class="bola">3</span><div><strong>Pronto!</strong><p class="dica">Marque pra venda sair da lista de bilhetes a enviar.</p><button class="btn ok largo" type="button" data-acao="bil-pronto" data-venda="' + esc(id) + '">Já mandei o bilhete</button></div></li>') +
+      '</ol>' +
+    '</div>');
+  carregarFotosEnvio();
+}
+
+async function carregarFotosEnvio() {
+  if (!envio) return;
+  const meu = envio.token;
+  const vivo = () => envio && envio.token === meu && ui.folha === 'bilhete';
+  const caixa = $('#bil-botoes');
+  if (caixa) caixa.innerHTML = '<button class="btn primario largo" type="button" disabled>Abrindo as fotos…</button>';
+  try {
+    const res = await Promise.all(envio.nums.map(n => fotoBilhete(n).then(f => [n, f])));
+    if (!vivo()) return;
+    envio.fotos = res.filter(r => r[1]).map(r => r[1]);
+    envio.faltam = res.filter(r => !r[1]).map(r => r[0]);
+    const previa = $('#bil-previa');
+    if (previa) previa.innerHTML = res.map(([n, f]) => f
+      ? '<figure class="bil-mini"><img src="' + f.url + '" alt="Bilhete ' + n + '"></figure>'
+      : '<figure class="bil-mini falta"><span>' + n + '<br>sem foto</span></figure>').join('');
+    renderBotoesEnvio();
+  } catch (e) {
+    if (!vivo()) return;
+    const c = $('#bil-botoes');
+    if (c) c.innerHTML = '<p class="dica erro">Não consegui abrir as fotos dos bilhetes agora. Confira a internet e tente de novo.</p>' +
+      '<button class="btn largo" type="button" data-acao="bil-tentar">Tentar de novo</button>';
+  }
+}
+
+function renderBotoesEnvio() {
+  const c = $('#bil-botoes'); if (!c || !envio) return;
+  const total = envio.fotos.length;
+  const share = podeCompartilharFotos();
+  const lotes = Math.ceil(total / FOTOS_POR_VEZ);
+  let h = '';
+  if (envio.faltam.length) h += '<p class="dica erro">Não achei a foto ' + (envio.faltam.length === 1 ? 'do número ' : 'dos números ') + envio.faltam.join(', ') + '. Confira se ' + (envio.faltam.length === 1 ? 'ele é' : 'eles são') + ' da sua rifa.</p>';
+  for (let i = 0; i < lotes; i++) {
+    const de = i * FOTOS_POR_VEZ + 1, ate = Math.min(total, (i + 1) * FOTOS_POR_VEZ);
+    const qual = lotes === 1 ? (total === 1 ? 'a foto' : 'as ' + total + ' fotos') : 'as fotos ' + de + ' a ' + ate;
+    const feito = envio.compartilhou.has(i);
+    h += '<button class="btn largo ' + (feito ? 'feito' : 'primario') + '" type="button" data-acao="bil-lote" data-lote="' + i + '">' +
+      (feito ? '✓ ' : '') + (share ? 'Mandar ' : 'Baixar ') + qual + '</button>';
+  }
+  if (lotes > 1 && share) h += '<p class="dica">O celular manda até ' + FOTOS_POR_VEZ + ' fotos de cada vez. Toque em um botão, envie, volte aqui e toque no próximo.</p>';
+  c.innerHTML = h;
+}
+
+async function mandarLoteBilhetes(i) {
+  if (!envio || !envio.fotos.length) return;
+  const arqs = envio.fotos.slice(i * FOTOS_POR_VEZ, (i + 1) * FOTOS_POR_VEZ).map(f => f.arq);
+  if (!arqs.length) return;
+  if (podeCompartilharFotos() && navigator.canShare({ files: arqs })) {
+    try {
+      await navigator.share({ files: arqs });
+      envio.compartilhou.add(i); renderBotoesEnvio();
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+  }
+  baixarArquivos(arqs);
+  envio.compartilhou.add(i); renderBotoesEnvio();
+  toast(arqs.length === 1 ? 'Foto baixada. É só mandar na conversa.' : 'Fotos baixadas. É só mandar na conversa.');
+}
+function baixarArquivos(arqs) {
+  arqs.forEach((arq, k) => setTimeout(() => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(arq); a.download = arq.name; a.hidden = true;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }, k * 300));
+}
 
 /* ---------- início ---------- */
 criarCamadas();

@@ -436,3 +436,20 @@ main>section:not(.banda)+section.banda{margin-top:22px}
 .slide img{box-shadow:0 8px 18px -10px rgba(19,36,31,.35)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .slide{background:color-mix(in srgb,var(--cor) 82%,rgba(255,255,255,.05));border-color:rgba(255,255,255,.3)!important}}
 :root[data-theme="dark"] .slide{background:color-mix(in srgb,var(--cor) 82%,rgba(255,255,255,.05));border-color:rgba(255,255,255,.3)!important}
+/* ---------- envio das fotos dos bilhetes (painel) ---------- */
+.bil-previa{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 8px;scroll-snap-type:x proximity;scrollbar-width:thin}
+.bil-mini{margin:0;flex:0 0 auto;width:150px;aspect-ratio:1348/813;border-radius:10px;overflow:hidden;background:var(--paper);border:1px solid var(--line);scroll-snap-align:start;display:flex;align-items:center;justify-content:center}
+.bil-mini img{display:block;width:100%;height:100%;object-fit:cover}
+.bil-mini span{font-weight:700;font-size:.85rem;color:var(--muted);text-align:center;line-height:1.3}
+.bil-mini.carregando{animation:bil-pisca 1.2s ease-in-out infinite}
+.bil-mini.falta{border-style:dashed}
+@keyframes bil-pisca{50%{opacity:.45}}
+@media (prefers-reduced-motion:reduce){.bil-mini.carregando{animation:none}}
+.bil-passos{list-style:none;margin:0;padding:0;display:grid;gap:18px}
+.bil-passos>li{display:grid;grid-template-columns:38px 1fr;gap:12px;align-items:start}
+.bil-passos>li>.bola{grid-row:auto;align-self:start}
+.bil-passos>li>div{display:grid;gap:8px}
+.bil-passos strong{font-size:1.02rem}
+.bil-passos .dica{margin:0}
+.bil-botoes{display:grid;gap:8px}
+.btn.feito{opacity:.75}
