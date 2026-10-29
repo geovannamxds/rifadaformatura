@@ -86,7 +86,7 @@ function foneBonito(s) {
 }
 function linkWa(fone, texto) { const n = foneWa(fone); return 'https://api.whatsapp.com/send?' + (n ? 'phone=' + n + '&' : '') + 'text=' + encodeURIComponent(texto); }
 function diaSemana(iso) { try { return new Date(iso + 'T12:00:00-03:00').toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' }); } catch (e) { return ''; } }
-function prazoDe(v) { const t = Date.parse(v.criadoEm || ''); return new Date((isNaN(t) ? Date.now() : t) + (Number(cfg.prazoReserva) || 24) * 3600000); }
+function prazoDe(v) { const t = Date.parse(v.criadoEm || ''); return new Date((isNaN(t) ? Date.now() : t) + ((Number(cfg.prazoReserva) || 24) + (Number(v.prazoExtraHoras) || 0)) * 3600000); }
 function liberada(v) { return !!v.liberadaEm && !(v.numeros || []).length; }
 function vencida(v) { return !v.pago && !v.semPrazo && !v.comprovanteEm && !liberada(v) && Date.now() > prazoDe(v).getTime(); }
 function vendasEncerradas() { return Date.now() > new Date(cfg.fimVendas + 'T23:59:59-03:00').getTime(); }
@@ -274,7 +274,7 @@ function ligarMensagens() {
 }
 
 /* ---------- estado da tela ---------- */
-const ui = { modo: 'publico', ehDona: false, bloco: 0, sel: new Set(), destaque: null, aba: cfg.pronto ? 'vendas' : 'ajustes', busca: '', filtro: 'todas', folha: null, vendaEdit: null, confirmarExclusao: false, publicando: false, nomeComprador: '' };
+const ui = { modo: 'publico', ehDona: false, bloco: 0, sel: new Set(), destaque: null, aba: cfg.pronto ? 'vendas' : 'ajustes', busca: '', filtro: 'todas', folha: null, vendaEdit: null, confirmarExclusao: false, publicando: false, nomeComprador: '', ordem: (function () { try { return localStorage.getItem('rifa-ordem') || 'prioridade'; } catch (e) { return 'prioridade'; } })(), maisAbertos: new Set() };
 let caps = { db: null, artifact: null, downloads: null };
 let vendas = [], vendasCarregadas = false, erroVendas = '';
 let timerPub = null, mudouNestaSessao = false;
@@ -486,7 +486,7 @@ function renderPublico() {
     '</div></header>' +
     '<main>' + htmlResultado() +
       '<section class="wrap secao" aria-labelledby="t-premios"><div class="secao-cab"><h2 id="t-premios">Concorra a <em>5 prêmios</em></h2><p class="dica">Cada número sorteado leva um. Arraste pro lado pra ver todos os prêmios desta leva! E fica de olho, que logo vem mais por aí 😉</p></div>' + htmlPremios() + '</section>' +
-      '<section class="wrap secao" id="escolha" aria-labelledby="t-escolha"><div class="secao-cab"><h2 id="t-escolha">Escolha seus <em>números</em></h2>' + linhaLivres + '</div><div id="meus-pedidos">' + htmlMeusPedidos() + '</div>' + escolha + '</section>' +
+      '<section class="wrap secao" id="escolha" aria-labelledby="t-escolha"><div class="secao-cab"><h2 id="t-escolha">Escolha seus <em>números</em></h2>' + linhaLivres + (aberta ? '<p class="hoje-pub" id="hoje-pub"' + (htmlHojePub() ? '' : ' hidden') + '>' + htmlHojePub() + '</p>' : '') + '</div><div id="meus-pedidos">' + htmlMeusPedidos() + '</div>' + escolha + '</section>' +
       '<section class="banda banda-creme" aria-labelledby="t-como"><canvas class="rabiscos" data-preset="creme" aria-hidden="true"></canvas><div class="wrap secao"><h2 id="t-como">Como comprar</h2><ol class="cartoes">' +
         (TEM_SB
           ? '<li><span class="bola">1</span><strong>Escolha os números</strong><span>Toque nos números livres. Pode escolher até ' + MAX_POR_PEDIDO + ' por pedido.</span></li>' +
@@ -530,8 +530,8 @@ function celHTML(n, admin, mapa) {
   let st, extra = '';
   if (admin) {
     const v = mapa.get(n);
-    st = v ? (v.pago ? 'pago' : 'aguardando') : (ui.sel.has(n) ? 'sel' : 'livre');
-    if (v) extra = ', ' + (v.pago ? 'pago' : 'aguardando pagamento') + ', ' + (v.nome || '');
+    st = v ? (v.pago ? 'pago' : v.comprovanteEm ? 'conferir' : v.semPrazo ? 'depois' : vencida(v) ? 'venceu' : 'aguardando') : (ui.sel.has(n) ? 'sel' : 'livre');
+    if (v) extra = ', ' + ({ pago: 'pago', conferir: 'comprovante pra conferir', depois: 'paga depois', venceu: 'prazo acabou', aguardando: 'aguardando pagamento' })[st] + ', ' + (v.nome || '');
   } else {
     st = ui.sel.has(n) ? 'sel' : (ocupadosPub.has(n) ? (meuEstado(n) || (reservadosPub.has(n) ? 'res' : 'ocupado')) : 'livre');
   }
@@ -700,7 +700,7 @@ function renderAdmin() {
         '<li>Boleto em aberto ou parcelas da formatura atrasadas tiram seus números do sorteio, e quem comprou de você perde a chance.</li>' +
       '</ul></details>' +
       '<nav class="abas" role="tablist" aria-label="Seções do painel">' +
-        [['vendas', 'Vendas'], ['numeros', 'Números'], ['mensagens', 'Mensagens'], ['ajustes', 'Ajustes']].map(a => '<button type="button" role="tab" class="aba" data-aba="' + a[0] + '" aria-selected="' + (ui.aba === a[0]) + '">' + a[1] + '</button>').join('') +
+        [['vendas', 'Vendas'], ['numeros', 'Números'], ['caixa', 'Caixa'], ['mensagens', 'Mensagens'], ['ajustes', 'Ajustes']].map(a => '<button type="button" role="tab" class="aba" data-aba="' + a[0] + '" aria-selected="' + (ui.aba === a[0]) + '">' + a[1] + '</button>').join('') +
       '</nav>' +
       '<section id="aba-corpo"></section>' +
     '</div>';
@@ -708,7 +708,7 @@ function renderAdmin() {
 }
 function renderAvisos() {
   const el = $('#avisos'); if (!el) return;
-  let h = htmlAvisoGanhadores();
+  let h = htmlAvisoGanhadores() + htmlConviteAvisos();
   if (cfg.pausado) h += '<div class="aviso alerta"><div><strong>⏸️ As vendas estão pausadas.</strong><p>Quem abre a página vê os prêmios e o seu aviso, mas não consegue reservar números.</p></div><button class="btn peq ok" type="button" data-acao="retomar">Retomar vendas</button></div>';
   if (!cfg.pronto) h += '<div class="aviso alerta"><div><strong>Falta pouco pra abrir as vendas.</strong><p>Preencha seu WhatsApp e o Pix em Ajustes, confira seus números e salve. Até lá, quem abre o link vê os prêmios e um aviso de “em breve”.</p></div></div>';
   if (erroVendas) h += '<div class="aviso alerta"><p>' + esc(erroVendas) + '</p></div>';
@@ -752,15 +752,20 @@ function renderAba() {
   if (ui.aba === 'vendas') {
     el.innerHTML =
       '<div class="lista-topo"><button class="btn primario" type="button" data-acao="nova-venda">+ Venda presencial</button>' +
-      '<div class="busca-v"><label for="busca-venda" class="sr">Buscar venda</label><input id="busca-venda" type="search" placeholder="Buscar por nome ou número" value="' + esc(ui.busca) + '"></div></div>' +
-      '<div class="filtros" id="filtros"></div><div id="lista" class="lista"></div>' +
+      '<div class="busca-v"><label for="busca-venda" class="sr">Buscar venda</label><input id="busca-venda" type="search" placeholder="Buscar por nome, número ou pedido" value="' + esc(ui.busca) + '"></div></div>' +
+      '<div class="filtros" id="filtros"></div>' +
+      '<div class="ordem-v"><label for="ordem-venda">Ordem</label><select id="ordem-venda"><option value="prioridade"' + (ui.ordem !== 'recentes' ? ' selected' : '') + '>O que precisa de mim primeiro</option><option value="recentes"' + (ui.ordem === 'recentes' ? ' selected' : '') + '>Mais recentes primeiro</option></select></div>' +
+      '<div id="lista" class="lista"></div>' +
       '<div class="export"><div class="linha-botoes"><button class="btn peq" type="button" data-acao="imprimir-lista">Imprimir lista de controle</button><button class="btn peq" type="button" data-acao="csv">Baixar planilha (.csv)</button></div><p class="dica">A lista de controle sai no modelo da Formô, uma página por bloco, pronta pra imprimir ou salvar em PDF. A planilha abre no Excel e no Google Planilhas.</p></div>';
     $('#busca-venda').addEventListener('input', e => { ui.busca = e.target.value; renderLista(); });
+    $('#ordem-venda').addEventListener('change', e => { ui.ordem = e.target.value; try { localStorage.setItem('rifa-ordem', ui.ordem); } catch (e2) { /* nada */ } renderLista(); });
     renderLista();
   } else if (ui.aba === 'numeros') {
     el.innerHTML = '<p class="dica">Toque nos números livres pra registrar uma venda feita pessoalmente. Toque num número com dono pra ver de quem é.</p><div id="area-grade"></div>' +
-      '<div class="legenda"><span><i class="amostra"></i>Livre</span><span><i class="amostra sel"></i>Selecionado</span><span><i class="amostra aguardando"></i>Aguardando pagamento</span><span><i class="amostra pago"></i>Pago</span></div>';
+      '<div class="legenda"><span><i class="amostra"></i>Livre</span><span><i class="amostra sel"></i>Selecionado</span><span><i class="amostra aguardando"></i>Aguardando pagamento</span><span><i class="amostra conferir"></i>Comprovante pra conferir</span><span><i class="amostra depois"></i>Paga depois</span><span><i class="amostra pago"></i>Pago</span>' + (vendas.some(vencida) ? '<span><i class="amostra venceu"></i>Prazo acabou</span>' : '') + '</div>';
     renderGrade(true);
+  } else if (ui.aba === 'caixa') {
+    el.innerHTML = '<div id="caixa" class="caixa">' + htmlCaixa() + '</div>';
   } else if (ui.aba === 'mensagens') {
     el.innerHTML = htmlMensagens();
     ligarMensagens();
@@ -785,24 +790,19 @@ function renderLista() {
   const arr = vendas.slice()
     .filter(v => ui.filtro === 'todas' || (ui.filtro === 'receber' ? (!v.pago && !liberada(v)) : ui.filtro === 'conferir' ? (!v.pago && !!v.comprovanteEm) : ui.filtro === 'vencidas' ? vencida(v) : ui.filtro === 'vencendo' ? venceLogo(v) : ui.filtro === 'liberadas' ? liberada(v) : (v.pago && !v.bilhete)))
     .filter(v => !q || String(v.nome || '').toLowerCase().includes(q) || String(v.codigo || '').toLowerCase() === q.replace(/^#/, '') || (v.numeros || []).concat(v.numerosLiberados || []).some(n => String(n).includes(q)) || soDigitos(v.telefone).includes(soDigitos(q) || '§'))
-    .sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')));
-  el.innerHTML = arr.length ? arr.map(cardVenda).join('') : '<p class="dica">Nenhuma venda encontrada.</p>';
+    .sort(ordenarVendas);
+  el.innerHTML = arr.length ? htmlListaVendas(arr) : '<p class="dica">Nenhuma venda encontrada.</p>';
 }
 function cardLiberada(v) {
   const nums = ordenar(v.numerosLiberados || []);
-  return '<article class="venda liberada">' +
-    '<div class="venda-topo"><span class="pill liberada">Reserva liberada</span><span class="num">' + brl(nums.length * cfg.preco) + '</span></div>' +
+  return '<article class="venda liberada" data-id="' + esc(v.id) + '">' +
+    '<div class="venda-topo">' + (v.comprovanteEm && Date.parse(v.comprovanteEm) > Date.parse(v.liberadaEm || 0) ? '<span class="pill conferir">📎 Pagou depois do prazo</span>' : '<span class="pill liberada">Reserva liberada</span>') + '<span class="num">' + brl(nums.length * cfg.preco) + '</span></div>' +
     '<div><h3 class="venda-nome">' + esc(v.nome || 'Sem nome') + '</h3>' + (v.telefone ? '<span class="dica">' + esc(foneBonito(v.telefone)) + '</span>' : '') + (v.codigo ? '<span class="dica cod-pedido">Pedido ' + esc(v.codigo) + (v.origem === 'site' ? ' · feito pelo site' : '') + '</span>' : (v.origem === 'presencial' ? '<span class="dica cod-pedido">Venda presencial</span>' : '')) + '</div>' +
     '<div class="chips">' + nums.map(n => '<span class="chip-num riscado">' + n + '</span>').join('') + '</div>' +
     '<p class="dica">Reservou em ' + fmtQuando(v.criadoEm) + ' · liberada em ' + fmtQuando(v.liberadaEm) + ', porque o pagamento não chegou no prazo.</p>' +
     (v.comprovanteEm && Date.parse(v.comprovanteEm) > Date.parse(v.liberadaEm || 0) ? '<p class="dica erro">📎 A pessoa mandou o comprovante em ' + fmtQuando(v.comprovanteEm) + ', depois do prazo. Confira o Pix e, se entrou, toque em “Recebi o pagamento”.</p>' : '') +
     (v.obs ? '<p class="dica">' + esc(v.obs) + '</p>' : '') +
-    '<div class="venda-acoes">' +
-      (v.comprovanteEm ? '<button class="btn peq primario" type="button" data-acao="ver-comprovante" data-venda="' + esc(v.id) + '">Ver comprovante</button>' : '') +
-      '<button class="btn peq ok" type="button" data-acao="devolver-pago" data-venda="' + esc(v.id) + '">Recebi o pagamento</button>' +
-      '<button class="btn peq" type="button" data-acao="devolver-reserva" data-venda="' + esc(v.id) + '">Reservar de novo</button>' +
-      '<button class="btn peq fantasma" type="button" data-acao="editar-venda" data-venda="' + esc(v.id) + '">Editar</button>' +
-    '</div></article>';
+    htmlAcoesVenda(v) + '</article>';
 }
 function devolverNumeros(id, pago) {
   const v = vendas.find(x => x.id === id); if (!v) return;
@@ -818,31 +818,14 @@ function devolverNumeros(id, pago) {
 function cardVenda(v) {
   if (liberada(v)) return cardLiberada(v);
   const nums = ordenar(v.numeros || []);
-  let acoes = '';
   const venc = vencida(v);
-  if (v.comprovanteEm && !v.pago) acoes += '<button class="btn peq primario" type="button" data-acao="ver-comprovante" data-venda="' + esc(v.id) + '">Ver comprovante</button>';
-  if (!v.pago) {
-    acoes += '<button class="btn peq ok" type="button" data-acao="marcar-pago" data-venda="' + esc(v.id) + '">Marcar como pago</button>' +
-      (venc ? '<button class="btn peq perigo" type="button" data-acao="liberar" data-venda="' + esc(v.id) + '">Liberar números</button>' : '') +
-      (v.comprovanteEm
-        ? (v.telefone ? '<a class="btn peq" href="' + esc(linkWa(v.telefone, 'Oi, ' + (primeiroNome(v.nome) || '') + '! ')) + '" target="_blank" rel="noopener">Abrir conversa</a>' : '')
-        : '<a class="btn peq" href="' + esc(linkWa(v.telefone, msgCobranca(v))) + '" target="_blank" rel="noopener">Cobrar no WhatsApp</a>' +
-          (pixCopiaECola(nums.length * cfg.preco, v) ? '<button class="btn peq" type="button" data-copiar="' + esc(pixCopiaECola(nums.length * cfg.preco, v)) + '">Copiar Pix desta venda</button>' : ''));
-  } else if (!v.bilhete) {
-    acoes += '<button class="btn peq primario" type="button" data-acao="enviar-bilhete" data-venda="' + esc(v.id) + '">Mandar bilhete no WhatsApp</button>' +
-      '<button class="btn peq" type="button" data-acao="marcar-bilhete" data-venda="' + esc(v.id) + '">Já mandei o bilhete</button>';
-  } else {
-    acoes += '<button class="btn peq" type="button" data-acao="enviar-bilhete" data-venda="' + esc(v.id) + '">Reenviar bilhete</button>';
-  }
-  if (v.comprovanteEm && v.pago) acoes += '<button class="btn peq fantasma" type="button" data-acao="ver-comprovante" data-venda="' + esc(v.id) + '">Comprovante</button>';
-  acoes += '<button class="btn peq fantasma" type="button" data-acao="editar-venda" data-venda="' + esc(v.id) + '">Editar</button>';
-  return '<article class="venda">' +
-    '<div class="venda-topo"><span class="pill ' + (v.pago ? 'pago' : (v.comprovanteEm ? 'conferir' : (venc ? 'vencida' : (venceLogo(v) ? 'vencendo' : 'aguardando')))) + '">' + (v.pago ? 'Pago' : (v.comprovanteEm ? '📎 Conferir comprovante' : (venc ? 'Reserva vencida' : (venceLogo(v) ? '⏰ Vence em ' + faltaTexto(v) : 'Aguardando pagamento')))) + '</span><span class="num">' + brl(nums.length * cfg.preco) + '</span></div>' +
+  return '<article class="venda" data-id="' + esc(v.id) + '">' +
+    '<div class="venda-topo"><span class="pill ' + (v.pago ? 'pago' : (v.comprovanteEm ? 'conferir' : (venc ? 'vencida' : (venceLogo(v) ? 'vencendo' : (v.semPrazo ? 'depois' : 'aguardando'))))) + '">' + (v.pago ? (v.bilhete ? 'Pago ✓' : 'Pago') : (v.comprovanteEm ? '📎 Conferir comprovante' : (venc ? 'Reserva vencida' : (venceLogo(v) ? '⏰ Vence em ' + faltaTexto(v) : (v.semPrazo ? '🤝 Paga depois' : 'Aguardando pagamento'))))) + (v.prazoExtraHoras ? ' · +' + v.prazoExtraHoras + 'h' : '') + '</span><span class="num">' + brl(nums.length * cfg.preco) + '</span></div>' +
     '<div><h3 class="venda-nome">' + esc(v.nome || 'Sem nome') + '</h3>' + (v.telefone ? '<span class="dica">' + esc(foneBonito(v.telefone)) + '</span>' : '') + (v.codigo ? '<span class="dica cod-pedido">Pedido ' + esc(v.codigo) + (v.origem === 'site' ? ' · feito pelo site' : '') + '</span>' : (v.origem === 'presencial' ? '<span class="dica cod-pedido">Venda presencial</span>' : '')) + '</div>' +
     '<div class="chips">' + nums.map(n => '<span class="chip-num">' + n + '</span>').join('') + '</div>' +
     htmlLinhaTempo(v, venc) +
     (v.obs ? '<p class="dica">' + esc(v.obs) + '</p>' : '') +
-    '<div class="venda-acoes">' + acoes + '</div></article>';
+    htmlAcoesVenda(v) + '</article>';
 }
 
 /* venda: nova / editar */
@@ -965,10 +948,15 @@ async function excluirVenda() {
   catch (e) { toast(msgErro(e, 'Não consegui excluir agora. Tente de novo.')); }
 }
 const ocupadoDoc = new Set();
-async function atualizarVenda(id, campos, msg) {
+async function atualizarVenda(id, campos, msg, desfazivel) {
   if (!caps.db || ocupadoDoc.has(id)) return;
+  const antes = vendas.find(x => x.id === id), ant = {};
+  if (antes) Object.keys(campos).forEach(k => { const a = antes[k]; ant[k] = a === undefined ? (k === 'prazoExtraHoras' ? 0 : k === 'pago' || k === 'bilhete' ? false : null) : (Array.isArray(a) ? a.slice() : a); });
   ocupadoDoc.add(id);
-  try { await caps.db.collection('vendas').doc(id).update(Object.assign({ atualizadoEm: new Date().toISOString() }, campos)); toast(msg); }
+  try {
+    await caps.db.collection('vendas').doc(id).update(Object.assign({ atualizadoEm: new Date().toISOString() }, campos));
+    if (desfazivel && antes) toastDesfazer(msg, () => atualizarVenda(id, ant, 'Desfeito ✓')); else toast(msg);
+  }
   catch (e) { toast(msgErro(e, 'Não consegui salvar agora. Tente de novo.')); }
   finally { ocupadoDoc.delete(id); }
 }
@@ -977,6 +965,7 @@ async function atualizarVenda(id, campos, msg) {
 function htmlAjustes() {
   const tipos = [['celular', 'Celular'], ['email', 'E-mail'], ['cpf', 'CPF ou CNPJ'], ['aleatoria', 'Chave aleatória']];
   return '<form id="f-ajustes" class="ajustes" novalidate>' +
+    (SB && PAGINA === 'admin' ? '<fieldset><legend>Avisos no celular</legend><div id="avisos-cel">' + htmlAvisosAjustes() + '</div></fieldset>' : '') +
     '<fieldset><legend>Seus dados</legend>' +
       '<div class="campo"><label for="a-vendedora">Seu nome (como os compradores te chamam)</label><input id="a-vendedora" type="text" value="' + esc(cfg.vendedora) + '"></div>' +
       '<div class="campo"><label for="a-whatsapp">Seu WhatsApp, com DDD</label><input id="a-whatsapp" type="tel" inputmode="tel" placeholder="(DDD) 99999-0000" value="' + esc(cfg.whatsapp ? foneBonito(cfg.whatsapp) : '') + '"><p class="dica">Os pedidos chegam nesse número.</p></div>' +
@@ -1143,6 +1132,13 @@ document.addEventListener('click', e => {
     case 'bloco-ant': ui.bloco--; renderGrade(ui.modo === 'admin'); break;
     case 'bloco-prox': ui.bloco++; renderGrade(ui.modo === 'admin'); break;
     case 'sorte': escolherPraMim(); break;
+    case 'mais-acoes': alternarMais(t); break;
+    case 'mais-prazo': darMaisPrazo(id); break;
+    case 'historico': abrirHistorico(id); break;
+    case 'avisos-ligar': ligarAvisos(); break;
+    case 'avisos-desligar': desligarAvisos(); break;
+    case 'avisos-teste': testarAvisos(false); break;
+    case 'avisos-depois': try { localStorage.setItem('rifa-avisos-depois', String(Date.now())); } catch (e2) { /* nada */ } renderAvisos(); break;
     case 'qtd-mais': escolherPraMim(true); break;
     case 'qtd-menos': tirarUltimo(); break;
     case 'prem-ant': if (irPremio) { pausarCarrossel(); irPremio(irPremio.atual() - 1, true); } break;
@@ -1157,8 +1153,8 @@ document.addEventListener('click', e => {
     case 'painel': ui.modo = 'admin'; ui.sel.clear(); window.scrollTo(0, 0); render(); break;
     case 'nova-venda': abrirVenda(null, []); break;
     case 'editar-venda': { const v = vendas.find(x => x.id === id); if (v) abrirVenda(v); break; }
-    case 'marcar-pago': atualizarVenda(id, { pago: true, pagoEm: new Date().toISOString() }, 'Marcado como pago'); break;
-    case 'marcar-bilhete': atualizarVenda(id, { bilhete: true }, 'Bilhete marcado como enviado'); break;
+    case 'marcar-pago': atualizarVenda(id, { pago: true, pagoEm: new Date().toISOString() }, 'Marcado como pago', true); break;
+    case 'marcar-bilhete': atualizarVenda(id, { bilhete: true }, 'Bilhete marcado como enviado', true); break;
     case 'abriu-bilhete': toast('Depois de mandar as imagens, toque em “Já mandei o bilhete”.'); break;
     case 'excluir-venda': ui.confirmarExclusao = true; renderZonaExcluir(); break;
     case 'cancelar-exclusao': ui.confirmarExclusao = false; renderZonaExcluir(); break;
@@ -1175,11 +1171,11 @@ document.addEventListener('click', e => {
     case 'aviso-mesmos': reservarDeNovo(t.dataset.nums); break;
     case 'aviso-outros': irEscolherOutros(); break;
     case 'ver-comprovante': abrirComprovantes(id); break;
-    case 'comp-pago': fecharFolha(); atualizarVenda(id, { pago: true, pagoEm: new Date().toISOString() }, 'Marcado como pago'); break;
+    case 'comp-pago': fecharFolha(); atualizarVenda(id, { pago: true, pagoEm: new Date().toISOString() }, 'Marcado como pago', true); break;
     case 'ver-conferir': ui.aba = 'vendas'; ui.filtro = 'conferir'; renderAba(); { const l = $('#lista'); if (l) l.scrollIntoView({ block: 'start' }); } break;
     case 'bil-lote': mandarLoteBilhetes(Number(t.dataset.lote)); break;
     case 'bil-tentar': carregarFotosEnvio(); break;
-    case 'bil-pronto': fecharFolha(); atualizarVenda(id, { bilhete: true }, 'Bilhete marcado como enviado'); break;
+    case 'bil-pronto': fecharFolha(); atualizarVenda(id, { bilhete: true }, 'Bilhete marcado como enviado', true); break;
     case 'retomar': retomarVendas(); break;
     case 'imprimir-lista': imprimirLista(); break;
     case 'ver-pedido': verPedido(t.dataset.codigo); break;
@@ -1251,6 +1247,7 @@ function aoMudarVendas() {
   renderAvisos(); renderResumo();
   if (ui.aba === 'vendas') renderLista();
   else if (ui.aba === 'numeros') renderGrade(true);
+  else if (ui.aba === 'caixa') { const c = $('#caixa'); if (c) { const ab = $$('#caixa details.dia').map(d => d.open); c.innerHTML = htmlCaixa(); $$('#caixa details.dia').forEach((d, i) => { if (ab[i] !== undefined) d.open = ab[i]; }); } }
   if (ui.folha === 'venda') { const i = $('#v-numeros'); if (i) i.dispatchEvent(new Event('input')); renderZonaExcluir(); }
 }
 function render() {
@@ -1309,7 +1306,7 @@ if (TEM_SB && PAGINA !== 'admin') {
    Versão do site (GitHub Pages) com banco de dados no Supabase
    ===================================================================== */
 const SB_TABELA = 'vendas';
-const CAMPOS_VENDA = { nome: 'nome', telefone: 'telefone', numeros: 'numeros', pago: 'pago', bilhete: 'bilhete', obs: 'obs', criadoEm: 'criado_em', atualizadoEm: 'atualizado_em', pagoEm: 'pago_em', liberadaEm: 'liberada_em', numerosLiberados: 'numeros_liberados', codigo: 'codigo', origem: 'origem', semPrazo: 'sem_prazo', comprovanteEm: 'comprovante_em' };
+const CAMPOS_VENDA = { nome: 'nome', telefone: 'telefone', numeros: 'numeros', pago: 'pago', bilhete: 'bilhete', obs: 'obs', criadoEm: 'criado_em', atualizadoEm: 'atualizado_em', pagoEm: 'pago_em', liberadaEm: 'liberada_em', numerosLiberados: 'numeros_liberados', codigo: 'codigo', origem: 'origem', semPrazo: 'sem_prazo', comprovanteEm: 'comprovante_em', prazoExtraHoras: 'prazo_extra_horas' };
 function paraLinha(d) {
   const r = {};
   Object.keys(CAMPOS_VENDA).forEach(k => { if (k in d && d[k] !== undefined) r[CAMPOS_VENDA[k]] = d[k]; });
@@ -1323,6 +1320,7 @@ function daLinha(r) {
   d.numeros = (d.numeros || []).map(Number); d.obs = d.obs || ''; d.telefone = d.telefone || '';
   d.numerosLiberados = (d.numerosLiberados || []).map(Number); d.liberadaEm = d.liberadaEm || null;
   d.semPrazo = !!d.semPrazo;
+  d.prazoExtraHoras = r.prazo_extra_horas == null ? undefined : (Number(r.prazo_extra_horas) || 0);
   return d;
 }
 function falhaSB(error) {
@@ -1493,11 +1491,13 @@ async function conectarSB() {
   ui.aba = !cfg.pronto ? 'ajustes' : (aba || 'vendas');
   ui.modo = 'admin'; ui.sel.clear();
   render();
+  iniciarAvisos();
   caps.db.collection('vendas').onSnapshot(snap => {
     vendas = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
     vendasCarregadas = true;
     erroVendas = '';
     aoMudarVendas();
+    mostrarVendaPedida();
   }, e => {
     if (e && e.code === 'sessao') { irParaLogin(); return; }
     if (!vendasCarregadas) erroVendas = 'Não consegui carregar suas vendas agora. Recarregue a página.';
@@ -1549,6 +1549,7 @@ function aplicarEstado(e) {
   const mudouOcup = novos.size !== ocupadosPub.size || Array.from(novos).some(n => !ocupadosPub.has(n)) ||
     novosRes.size !== reservadosPub.size || Array.from(novosRes).some(n => !reservadosPub.has(n));
   const linha = $('#linha-livres');
+  if (e && e.hoje != null) { hojePub = Number(e.hoje) || 0; atualizarHojePub(); }
   if (!mudouCfg && !mudouOcup) { if (e.atualizado) atualizadoPub = e.atualizado; if (linha) linha.textContent = textoLivres(); return; }
   if (mudouOcup && PAGINA !== 'admin' && lerPedidosLocais().length) setTimeout(sincronizarMeusPedidos, 50);
   const sobraLivre = lerFaixas(cfgNovo.faixas).nums.some(n => !novos.has(n));
@@ -1728,13 +1729,13 @@ function htmlPixPedido(total, rotuloId, pedido) {
   if (!cfg.pixChave) return '';
   const cc = pixCopiaECola(total, pedido);
   const outros = lerPedidosLocais().filter(x => pedidoVisivel(x) && situacaoDe(x) === 'aguardando' && (!pedido || x.codigo !== pedido.codigo)).length;
-  return '<li><h3>Pague por Pix</h3>' +
+  return '<li class="pix-li"><h3>Pague por Pix</h3>' +
     '<p class="pix-valor">Valor deste pedido: <strong class="num">' + brl(total) + '</strong></p>' +
     '<p class="dica">Confira se o app do banco mostra ' + brl(total) + ' antes de confirmar.' + (outros ? ' Você tem outro pedido esperando: pague cada um com o Pix do próprio pedido.' : '') + '</p>' +
     '<p class="dica">Chave Pix (' + ROTULO_PIX[cfg.pixTipo] + ')' + (cfg.pixNome ? ' · em nome de ' + esc(cfg.pixNome) : '') + '</p>' +
     '<div class="copia"><code>' + esc(cfg.pixChave) + '</code><button class="btn peq" type="button" data-copiar="' + esc(cfg.pixChave) + '">Copiar chave</button></div>' +
     (cc ? '<p class="dica">Ou use o Pix copia e cola, que já vem com o valor de ' + brl(total) + ':</p><div class="copia-cc"><textarea id="' + rotuloId + '" class="cc-campo" readonly rows="4" aria-label="Código Pix copia e cola">' + esc(cc) + '</textarea><button class="btn peq" type="button" data-copiar="' + esc(cc) + '" data-alvo="' + rotuloId + '">Copiar código</button></div>' : '') +
-    (cc && qrSVG(cc) ? '<div class="qr-pix">' + qrSVG(cc, 'QR Code Pix de ' + brl(total)) + '<p>Tá no computador ou no celular de outra pessoa? Escaneie com o app do banco.</p></div>' : '') +
+    (cc && qrSVG(cc) ? '<div class="qr-pix">' + qrSVG(cc, 'QR Code Pix de ' + brl(total)) + '<p class="qr-cel">Tá no computador ou no celular de outra pessoa? Escaneie com o app do banco.</p><p class="qr-pc">No computador? Abra o app do banco no celular e escaneie este QR Code.</p></div>' : '') +
   '</li>';
 }
 function abrirPagamento(p) {
@@ -2702,6 +2703,345 @@ function reservarDeNovo(lista) {
 function irEscolherOutros() {
   fecharFolha();
   const s = $('#escolha'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* =====================================================================
+   Painel avançado: prioridade, +24h, desfazer, histórico, cartões enxutos,
+   caixa, avisos no celular
+   ===================================================================== */
+
+/* ---------- ordem "o que precisa de mim primeiro" ---------- */
+function rankVenda(v) {
+  if (!v.pago && v.comprovanteEm && (!liberada(v) || Date.parse(v.comprovanteEm) > Date.parse(v.liberadaEm || 0))) return 0;
+  if (vencida(v)) return 1;
+  if (venceLogo(v)) return 2;
+  if (v.pago && !v.bilhete) return 3;
+  if (!v.pago && !liberada(v)) return 4;
+  if (v.pago) return 5;
+  return 6;
+}
+const GRUPOS_VENDA = { 0: 'Precisa de você agora', 4: 'Esperando o pagamento', 5: 'Tudo certo', 6: 'Liberadas' };
+function grupoDoRank(r) { return r <= 3 ? 0 : r; }
+function ordenarVendas(a, b) {
+  if (ui.ordem === 'recentes') return String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''));
+  const ra = rankVenda(a), rb = rankVenda(b);
+  if (ra !== rb) return ra - rb;
+  if (ra === 0) return String(a.comprovanteEm || '').localeCompare(String(b.comprovanteEm || ''));
+  if (ra === 1 || ra === 2 || (ra === 4 && !a.semPrazo && !b.semPrazo)) return prazoDe(a) - prazoDe(b);
+  if (ra === 3) return String(a.pagoEm || '').localeCompare(String(b.pagoEm || ''));
+  return String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''));
+}
+function htmlListaVendas(arr) {
+  if (ui.ordem === 'recentes' || ui.filtro !== 'todas' || ui.busca.trim()) return arr.map(cardVenda).join('');
+  let h = '', grupo = null;
+  arr.forEach(v => {
+    const g = grupoDoRank(rankVenda(v));
+    if (g !== grupo) { grupo = g; h += '<h3 class="grupo-vendas">' + GRUPOS_VENDA[g] + '</h3>'; }
+    h += cardVenda(v);
+  });
+  return h;
+}
+
+/* ---------- botões dos cartões: principais + "Mais" ---------- */
+function bt(acao, id, txt, cls) { return '<button class="btn peq' + (cls ? ' ' + cls : '') + '" type="button" data-acao="' + acao + '" data-venda="' + esc(id) + '">' + txt + '</button>'; }
+function htmlAcoesVenda(v) {
+  const p = [], x = [];
+  const nums = ordenar(v.numeros || []);
+  const temCol = v.prazoExtraHoras !== undefined;
+  const cobrar = v.telefone ? '<a class="btn peq" href="' + esc(linkWa(v.telefone, msgCobranca(v))) + '" target="_blank" rel="noopener">Cobrar no WhatsApp</a>' : '';
+  const conversa = v.telefone ? '<a class="btn peq" href="' + esc(linkWa(v.telefone, 'Oi, ' + (primeiroNome(v.nome) || '') + '! ')) + '" target="_blank" rel="noopener">Abrir conversa</a>' : '';
+  const cc = pixCopiaECola(nums.length * cfg.preco, v);
+  const copiarPix = cc ? '<button class="btn peq" type="button" data-copiar="' + esc(cc) + '">Copiar Pix desta venda</button>' : '';
+  const mais24 = temCol && !v.semPrazo ? bt('mais-prazo', v.id, '⏰ Dar mais 24h') : '';
+  if (liberada(v)) {
+    const tarde = v.comprovanteEm && Date.parse(v.comprovanteEm) > Date.parse(v.liberadaEm || 0);
+    if (tarde) p.push(bt('ver-comprovante', v.id, 'Ver comprovante', 'primario'));
+    p.push(bt('devolver-pago', v.id, 'Recebi o pagamento', 'ok'));
+    x.push(bt('devolver-reserva', v.id, 'Reservar de novo'), conversa);
+  } else if (!v.pago && v.comprovanteEm) {
+    p.push(bt('ver-comprovante', v.id, 'Ver comprovante', 'primario'), bt('marcar-pago', v.id, 'Marcar como pago', 'ok'));
+    x.push(conversa);
+  } else if (!v.pago) {
+    p.push(bt('marcar-pago', v.id, 'Marcar como pago', 'ok'));
+    if (vencida(v)) { p.push(mais24 || cobrar); x.push(mais24 ? cobrar : '', copiarPix, bt('liberar', v.id, 'Liberar números', 'perigo')); }
+    else if (venceLogo(v)) { p.push(cobrar, mais24); x.push(copiarPix); }
+    else { p.push(cobrar); x.push(mais24, copiarPix); }
+  } else if (!v.bilhete) {
+    p.push(bt('enviar-bilhete', v.id, 'Mandar bilhete no WhatsApp', 'primario'));
+    x.push(bt('marcar-bilhete', v.id, 'Já mandei o bilhete'));
+    if (v.comprovanteEm) x.push(bt('ver-comprovante', v.id, 'Comprovante'));
+  } else {
+    x.push(bt('enviar-bilhete', v.id, 'Reenviar bilhete'));
+    if (v.comprovanteEm) x.push(bt('ver-comprovante', v.id, 'Comprovante'));
+  }
+  if (TEM_SB && SB) x.push(bt('historico', v.id, '🕘 Histórico'));
+  x.push(bt('editar-venda', v.id, 'Editar', 'fantasma'));
+  const extras = x.filter(Boolean);
+  const aberto = ui.maisAbertos && ui.maisAbertos.has(v.id);
+  return '<div class="venda-acoes">' + p.filter(Boolean).join('') +
+      (extras.length ? '<button class="btn peq fantasma btn-mais" type="button" data-acao="mais-acoes" data-venda="' + esc(v.id) + '" aria-expanded="' + !!aberto + '">' + (aberto ? 'Menos ▴' : 'Mais ▾') + '</button>' : '') + '</div>' +
+    (extras.length ? '<div class="venda-mais"' + (aberto ? '' : ' hidden') + '>' + extras.join('') + '</div>' : '');
+}
+function alternarMais(t) {
+  const id = t.dataset.venda; if (!ui.maisAbertos) ui.maisAbertos = new Set();
+  const art = t.closest('.venda'); const caixa = art && art.querySelector('.venda-mais'); if (!caixa) return;
+  const abrir = caixa.hidden;
+  caixa.hidden = !abrir; t.setAttribute('aria-expanded', String(abrir)); t.textContent = abrir ? 'Menos ▴' : 'Mais ▾';
+  if (abrir) ui.maisAbertos.add(id); else ui.maisAbertos.delete(id);
+}
+
+/* ---------- +24h ---------- */
+function darMaisPrazo(id) {
+  const v = vendas.find(x => x.id === id); if (!v) return;
+  const extra = (Number(v.prazoExtraHoras) || 0) + 24;
+  if (extra > 720) { toast('Essa reserva já ganhou o máximo de prazo extra (30 dias).'); return; }
+  let novo = new Date(Date.parse(v.criadoEm || '') + ((Number(cfg.prazoReserva) || 24) + extra) * 3600000);
+  atualizarVenda(id, { prazoExtraHoras: extra }, 'Mais 24h pra ' + (primeiroNome(v.nome) || 'essa reserva') + '. Novo prazo: ' + fmtQuando(novo.toISOString()) + '.', true);
+}
+
+/* ---------- desfazer ---------- */
+let desfazerTimer = null;
+function toastDesfazer(msg, desfazer) {
+  let t = $('#toast-desfazer');
+  if (!t) {
+    t = document.createElement('div'); t.id = 'toast-desfazer'; t.className = 'toast-desfazer'; t.setAttribute('role', 'status'); t.hidden = true;
+    document.body.appendChild(t);
+  }
+  const tt = $('#toast'); if (tt) tt.hidden = true;
+  t.innerHTML = '<span></span><button type="button" class="desfazer">Desfazer</button>';
+  t.firstChild.textContent = msg;
+  const b = $('#barra'); t.style.bottom = b && !b.hidden && b.offsetHeight ? (b.offsetHeight + 14) + 'px' : '';
+  t.hidden = false;
+  t.querySelector('.desfazer').onclick = () => { t.hidden = true; clearTimeout(desfazerTimer); desfazer(); };
+  clearTimeout(desfazerTimer); desfazerTimer = setTimeout(() => { t.hidden = true; }, 7000);
+}
+
+/* ---------- histórico ---------- */
+const EVENTOS = {
+  pedido: ['🛒', 'Fez o pedido pelo site'], venda: ['📝', 'Venda registrada no painel'],
+  comprovante: ['📎', 'Comprovante anexado na página'], pago: ['✅', 'Pagamento confirmado'],
+  pago_desfeito: ['↩️', 'Pagamento desmarcado'], bilhete: ['🎟️', 'Bilhete marcado como enviado'],
+  bilhete_desfeito: ['↩️', 'Bilhete desmarcado'], liberada: ['⏳', 'Prazo acabou: números liberados'],
+  devolvida: ['🔁', 'Números devolvidos pra venda'], numeros: ['✏️', 'Números trocados'],
+  prazo_extra: ['⏰', 'Prazo estendido'], sem_prazo: ['🤝', 'Combinado: paga depois, sem prazo'],
+  com_prazo: ['⏱️', 'Voltou a ter prazo pra pagar'], excluida: ['🗑️', 'Venda excluída']
+};
+const QUEM = { painel: 'por você', pagina: 'pela página', automatico: 'automático' };
+function eventosDosCampos(v) {
+  const e = [{ quando: v.criadoEm, evento: v.origem === 'site' ? 'pedido' : 'venda', detalhe: ordenar((v.numeros || []).length ? v.numeros : (v.numerosLiberados || [])).join(', ') }];
+  if (v.comprovanteEm) e.push({ quando: v.comprovanteEm, evento: 'comprovante' });
+  if (v.pago && v.pagoEm) e.push({ quando: v.pagoEm, evento: 'pago' });
+  if (v.liberadaEm) e.push({ quando: v.liberadaEm, evento: 'liberada', detalhe: ordenar(v.numerosLiberados || []).join(', ') });
+  return e.sort((a, b) => String(a.quando).localeCompare(String(b.quando)));
+}
+async function abrirHistorico(id) {
+  const v = vendas.find(x => x.id === id); if (!v) return;
+  abrirFolha('historico', '<div class="folha-cab">' + cabFolha('Histórico') + '<p class="dica">' + esc(v.nome || 'Sem nome') + (v.codigo ? ' · pedido ' + esc(v.codigo) : '') + '</p></div><div class="folha-corpo" id="hist-corpo"><p class="dica">Carregando…</p></div>');
+  let evs = null;
+  try {
+    const { data, error } = await SB.from('vendas_historico').select('quando, evento, detalhe, quem').eq('venda_id', id).order('quando', { ascending: true });
+    if (!error && Array.isArray(data)) { const ok = data.filter(e => e && e.evento); if (ok.length) evs = ok; }
+  } catch (e) { /* usa as datas da venda */ }
+  if (ui.folha !== 'historico') return;
+  if (!evs) evs = eventosDosCampos(v);
+  if (v.bilhete && !evs.some(e => e.evento === 'bilhete')) evs.push({ quando: null, evento: 'bilhete', detalhe: '' });
+  let prox = '';
+  if (!v.pago && !liberada(v)) prox = v.comprovanteEm ? 'Próximo passo: conferir o Pix no app do banco.' : v.semPrazo ? 'Sem prazo: combinado com você.' : (vencida(v) ? 'O prazo acabou em ' : 'Prazo pra pagar: ') + fmtQuando(prazoDe(v).toISOString()) + '.';
+  else if (v.pago && !v.bilhete) prox = 'Próximo passo: mandar o bilhete.';
+  const c = $('#hist-corpo'); if (!c) return;
+  c.innerHTML = '<ol class="historico">' + evs.map(e => {
+    const d = EVENTOS[e.evento] || ['•', e.evento];
+    let det = e.detalhe || '';
+    if (e.evento === 'prazo_extra') det = '+' + det + 'h';
+    return '<li><span class="hist-ic" aria-hidden="true">' + d[0] + '</span><div><strong>' + d[1] + '</strong>' +
+      (det ? '<span class="dica"> · ' + esc(det) + '</span>' : '') +
+      '<span class="dica hist-quando">' + (e.quando ? fmtQuando(e.quando) : 'sem horário registrado') + (e.quem && QUEM[e.quem] ? ' · ' + QUEM[e.quem] : '') + '</span></div></li>';
+  }).join('') + '</ol>' + (prox ? '<p class="nota">' + esc(prox) + '</p>' : '');
+}
+
+/* ---------- caixa (fechamento do dia) ---------- */
+function diaSP(iso) { try { return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); } catch (e) { return ''; } }
+function nomeDia(d) {
+  const hoje = diaSP(new Date().toISOString()), ontem = diaSP(new Date(Date.now() - 86400000).toISOString());
+  if (d === hoje) return 'Hoje';
+  if (d === ontem) return 'Ontem';
+  const [a, m, di] = d.split('-'); return di + '/' + m;
+}
+function horaSP(iso) { try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }); } catch (e) { return ''; } }
+function htmlCaixa() {
+  if (!vendasCarregadas) return '<p class="dica">Carregando…</p>';
+  const pagas = vendas.filter(v => v.pago && (v.numeros || []).length);
+  const dias = new Map();
+  pagas.forEach(v => { const d = v.pagoEm ? diaSP(v.pagoEm) : 'sem-data'; if (!dias.has(d)) dias.set(d, []); dias.get(d).push(v); });
+  const chaves = Array.from(dias.keys()).sort((a, b) => b.localeCompare(a));
+  const totalDe = l => l.reduce((s, v) => s + v.numeros.length, 0) * cfg.preco;
+  const hoje = dias.get(diaSP(new Date().toISOString())) || [];
+  const c = contas();
+  let h = '<dl class="metricas caixa-topo"><div><dt>Entrou hoje</dt><dd class="num">' + brl(totalDe(hoje)) + '</dd></div><div><dt>Recebido</dt><dd class="num">' + brl(c.recebido) + '</dd></div><div><dt>A receber</dt><dd class="num">' + brl(c.areceber) + '</dd></div></dl>' +
+    '<h3 class="caixa-t">Pagamentos por dia</h3><p class="dica">Confira cada valor no extrato do banco. O horário é quando você marcou como pago.</p>';
+  if (!chaves.length) h += '<p class="dica">Nenhum pagamento confirmado ainda.</p>';
+  chaves.forEach((d, i) => {
+    const l = dias.get(d).slice().sort((a, b) => String(a.pagoEm || '').localeCompare(String(b.pagoEm || '')));
+    const nn = l.reduce((s, v) => s + v.numeros.length, 0);
+    h += '<details class="dia"' + (i === 0 ? ' open' : '') + '><summary><span>' + (d === 'sem-data' ? 'Sem data' : nomeDia(d)) + '</span><span class="dica">' + l.length + ' ' + plural(l.length, 'venda', 'vendas') + ' · ' + nn + ' ' + plural(nn, 'número', 'números') + '</span><strong class="num">' + brl(totalDe(l)) + '</strong></summary>' +
+      '<ul class="dia-lista">' + l.map(v => '<li><span class="num">' + (v.pagoEm ? horaSP(v.pagoEm) : '–') + '</span><span>' + esc(v.nome || 'Sem nome') + '<span class="dica"> · ' + v.numeros.length + ' ' + plural(v.numeros.length, 'número', 'números') + (v.origem === 'presencial' ? ' · presencial' : v.codigo ? ' · ' + esc(v.codigo) : '') + '</span></span><strong class="num">' + brl(v.numeros.length * cfg.preco) + '</strong></li>').join('') + '</ul>' +
+      '<button class="btn peq" type="button" data-copiar="' + esc(resumoDia(d, l)) + '">Copiar resumo do dia</button></details>';
+  });
+  const mapa = mapaVendas();
+  h += '<h3 class="caixa-t">Blocos da Formô</h3><p class="dica">Na conferência você paga o bloco inteiro, vendido ou não. Aqui dá pra ver quanto de cada bloco já entrou.</p><div class="blocos-caixa">';
+  BLOCOS.forEach(b => {
+    let pg = 0, ag = 0; b.nums.forEach(n => { const v = mapa.get(n); if (v) { if (v.pago) pg++; else ag++; } });
+    const valor = b.nums.length * cfg.preco, entrou = pg * cfg.preco;
+    h += '<div class="bloco-caixa"><div class="bc-cab"><strong>' + b.ini + '–' + b.fim + '</strong><span class="num">' + brl(entrou) + ' de ' + brl(valor) + '</span></div>' +
+      '<div class="prog"><span class="p" style="width:' + (pg / b.nums.length * 100).toFixed(1) + '%"></span><span class="a" style="width:' + (ag / b.nums.length * 100).toFixed(1) + '%"></span></div>' +
+      '<p class="dica">' + pg + ' pagos · ' + ag + ' aguardando · ' + (b.nums.length - pg - ag) + ' livres' + (valor - entrou > 0 ? ' · falta ' + brl(valor - entrou) : ' · bloco pago ✓') + '</p></div>';
+  });
+  return h + '</div>';
+}
+function resumoDia(d, l) {
+  const titulo = d === 'sem-data' ? 'Pagamentos sem data' : 'Rifa · pagamentos de ' + (d.split('-').reverse().slice(0, 2).join('/'));
+  return titulo + '\n' + l.map(v => (v.pagoEm ? horaSP(v.pagoEm) + ' · ' : '') + (v.nome || 'Sem nome') + ' · ' + listaNums(ordenar(v.numeros)) + ' · ' + brl(v.numeros.length * cfg.preco)).join('\n') +
+    '\nTotal: ' + brl(l.reduce((s, v) => s + v.numeros.length, 0) * cfg.preco);
+}
+
+/* ---------- abrir uma venda pelo aviso do celular (?venda=...) ---------- */
+let vendaPedidaNaUrl = null;
+try { vendaPedidaNaUrl = new URLSearchParams(location.search).get('venda'); } catch (e) { /* nada */ }
+function mostrarVendaPedida() {
+  if (!vendaPedidaNaUrl || !vendasCarregadas || ui.modo !== 'admin') return;
+  const id = vendaPedidaNaUrl; vendaPedidaNaUrl = null;
+  try { history.replaceState(null, '', location.pathname); } catch (e) { /* nada */ }
+  if (!vendas.some(v => v.id === id)) return;
+  ui.aba = 'vendas'; ui.filtro = 'todas'; ui.busca = '';
+  renderAba();
+  setTimeout(() => {
+    const art = $('.venda[data-id="' + id + '"]');
+    if (art) { art.scrollIntoView({ block: 'center', behavior: 'smooth' }); art.classList.add('pisca-venda'); setTimeout(() => art.classList.remove('pisca-venda'), 2600); }
+  }, 60);
+}
+
+/* ---------- avisos no celular ---------- */
+const VAPID_PUBLICA = 'BICP6goav75fYPWCf3n3iYNLYyYsgoQq0vXTkVCHHtizfiBiZ-OQihs1g32rA1fwl3nsKzOTVii31LZcx2-YRro';
+const avisos = { suporte: false, inscrito: false, carregando: false, aparelhos: null, erro: '', pronto: false };
+function suporteAvisos() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function ehIOS() { return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function instalado() { return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+function chaveAplicacao() {
+  const s = VAPID_PUBLICA.replace(/-/g, '+').replace(/_/g, '/'); const b = atob(s + '='.repeat((4 - s.length % 4) % 4));
+  return Uint8Array.from(b, c => c.charCodeAt(0));
+}
+function nomeAparelho() {
+  const u = navigator.userAgent;
+  return (/iPhone/.test(u) ? 'iPhone' : /iPad/.test(u) ? 'iPad' : /Android/.test(u) ? 'Android' : /Mac/.test(u) ? 'Mac' : /Windows/.test(u) ? 'Windows' : 'Aparelho') + (instalado() ? ' (app)' : '');
+}
+async function registroAvisos() {
+  if (!suporteAvisos()) return null;
+  try { return await navigator.serviceWorker.register('sw.js', { scope: './' }); } catch (e) { return null; }
+}
+async function iniciarAvisos() {
+  if (PAGINA !== 'admin' || !SB) return;
+  avisos.suporte = suporteAvisos();
+  if (!avisos.suporte) { contarAparelhos(); return; }
+  const reg = await registroAvisos();
+  const sub = reg ? await reg.pushManager.getSubscription().catch(() => null) : null;
+  avisos.inscrito = !!sub && Notification.permission === 'granted';
+  if (avisos.inscrito) salvarInscricao(sub).catch(() => {});
+  contarAparelhos();
+  atualizarAvisosUI();
+}
+async function salvarInscricao(sub) {
+  const j = sub.toJSON();
+  const { error } = await SB.from('avisos_inscricoes').upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, aparelho: nomeAparelho() }, { onConflict: 'endpoint' });
+  if (error) throw error;
+}
+async function contarAparelhos() {
+  try {
+    const { count, error } = await SB.from('avisos_inscricoes').select('id', { count: 'exact', head: true });
+    avisos.pronto = !error; if (!error) avisos.aparelhos = count || 0;
+  } catch (e) { avisos.pronto = false; }
+  atualizarAvisosUI(); renderAvisos();
+}
+async function ligarAvisos() {
+  avisos.erro = ''; avisos.carregando = true; atualizarAvisosUI();
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') throw new Error(perm === 'denied' ? 'bloqueado' : 'sem-resposta');
+    const reg = await registroAvisos(); if (!reg) throw new Error('sw');
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveAplicacao() });
+    await salvarInscricao(sub);
+    avisos.inscrito = true;
+    try { localStorage.removeItem('rifa-avisos-depois'); } catch (e) { /* nada */ }
+    toast('Avisos ligados neste aparelho! 🔔 Mandei um de teste.');
+    testarAvisos(true);
+  } catch (e) {
+    const m = String((e && e.message) || '');
+    avisos.erro = m === 'bloqueado' ? 'Os avisos estão bloqueados pra este site. Libere nas configurações do celular (ou do navegador) e tente de novo.'
+      : m === 'sem-resposta' ? 'Pra ligar, toque em "Permitir" quando o celular perguntar.'
+      : (m.indexOf('avisos_inscricoes') >= 0 || (e && e.code === '42P01')) ? 'O banco ainda não está pronto pros avisos.'
+      : 'Não consegui ligar os avisos agora. Tente de novo.';
+  } finally { avisos.carregando = false; contarAparelhos(); atualizarAvisosUI(); renderAvisos(); }
+}
+async function desligarAvisos() {
+  try {
+    const reg = await registroAvisos(); const sub = reg ? await reg.pushManager.getSubscription() : null;
+    if (sub) { await SB.from('avisos_inscricoes').delete().eq('endpoint', sub.endpoint); await sub.unsubscribe(); }
+    avisos.inscrito = false; toast('Avisos desligados neste aparelho.');
+  } catch (e) { toast('Não consegui desligar agora. Tente de novo.'); }
+  contarAparelhos(); atualizarAvisosUI();
+}
+async function testarAvisos(silencioso) {
+  try {
+    const { data: id, error } = await SB.rpc('testar_aviso');
+    if (error) throw error;
+    if (!id) { if (!silencioso) toast('Nenhum aparelho com avisos ligados.'); return; }
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 1500));
+      const { data } = await SB.from('avisos_fila').select('resultado').eq('id', id).maybeSingle();
+      const res = data && data.resultado;
+      if (Array.isArray(res) && res.length) {
+        const ok = res.filter(r => r.status >= 200 && r.status < 300).length;
+        if (!silencioso || !ok) toast(ok ? 'Aviso de teste enviado pra ' + ok + ' ' + plural(ok, 'aparelho', 'aparelhos') + '. Chegou? 🔔' : 'O aviso não chegou nos aparelhos (erro ' + res[0].status + '). Desligue e ligue de novo.');
+        return;
+      }
+    }
+    if (!silencioso) toast('O aviso está demorando. Se não chegar em 1 minuto, me avisa.');
+  } catch (e) { if (!silencioso) toast('Não consegui mandar o teste agora.'); }
+}
+function htmlAvisosAjustes() {
+  let corpo;
+  if (avisos.suporte && !avisos.pronto) {
+    corpo = '<p class="dica">Os avisos no celular estão quase prontos: falta só uma etapa no banco de dados.</p>';
+  } else if (!avisos.suporte) {
+    corpo = ehIOS() && !instalado()
+      ? '<p>No iPhone, os avisos só funcionam com o painel instalado: no Safari, toque em <strong>Compartilhar</strong> → <strong>Adicionar à Tela de Início</strong>. Depois abra o painel pelo ícone e volte aqui.</p>'
+      : '<p class="dica">Este navegador não recebe avisos. No Android, use o Chrome. No iPhone, instale o painel na tela de início.</p>';
+  } else if (avisos.inscrito) {
+    corpo = '<p class="ok-txt">✓ Avisos ligados neste aparelho.</p><p class="dica">Chega um aviso quando alguém faz um pedido pelo site e quando um comprovante é anexado.' + (avisos.aparelhos ? ' ' + avisos.aparelhos + ' ' + plural(avisos.aparelhos, 'aparelho recebe', 'aparelhos recebem') + ' os avisos.' : '') + '</p>' +
+      '<div class="linha-botoes"><button class="btn peq" type="button" data-acao="avisos-teste">Mandar aviso de teste</button><button class="btn peq fantasma" type="button" data-acao="avisos-desligar">Desligar neste aparelho</button></div>';
+  } else {
+    corpo = '<p class="dica">Receba um aviso no ' + (ehIOS() || /Android/.test(navigator.userAgent) ? 'celular' : 'computador') + ' quando alguém fizer um pedido pelo site ou anexar um comprovante, mesmo com o painel fechado.</p>' +
+      '<button class="btn peq primario" type="button" data-acao="avisos-ligar"' + (avisos.carregando ? ' disabled' : '') + '>' + (avisos.carregando ? 'Ligando…' : '🔔 Ligar avisos neste aparelho') + '</button>';
+  }
+  return corpo + (avisos.erro ? '<p class="erro">' + esc(avisos.erro) + '</p>' : '');
+}
+function atualizarAvisosUI() { const el = $('#avisos-cel'); if (el) el.innerHTML = htmlAvisosAjustes(); }
+function htmlConviteAvisos() {
+  if (PAGINA !== 'admin' || !SB || avisos.inscrito || !avisos.suporte || !avisos.pronto) return '';
+  try { const t = Number(localStorage.getItem('rifa-avisos-depois') || 0); if (Date.now() - t < 7 * 86400000) return ''; } catch (e) { /* nada */ }
+  return '<div class="aviso convite-avisos"><div><strong>🔔 Quer um aviso no celular quando chegar pedido ou comprovante?</strong><p>Assim você confirma rapidinho, sem ficar abrindo o painel.</p></div>' +
+    '<div class="linha-botoes"><button class="btn peq primario" type="button" data-acao="avisos-ligar">Ligar avisos</button><button class="btn peq fantasma" type="button" data-acao="avisos-depois">Agora não</button></div></div>';
+}
+
+/* ---------- página: "números garantidos hoje" ---------- */
+let hojePub = 0;
+function htmlHojePub() {
+  return (TEM_SB && cfg.mostrarContador && hojePub >= 3 && !vendasEncerradas()) ? '🔥 ' + hojePub + ' números garantidos hoje' : '';
+}
+function atualizarHojePub() {
+  const el = $('#hoje-pub'); if (!el) return;
+  const t = htmlHojePub(); el.textContent = t; el.hidden = !t;
 }
 
 /* ---------- início ---------- */
