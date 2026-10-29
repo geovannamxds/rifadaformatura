@@ -17,6 +17,7 @@ Página de vendas dos números da Rifa Formô 26.2, com painel de controle prote
 - `supabase/pedidos-pelo-site.sql`: o comprador faz o pedido na página (nome, WhatsApp, números) e os números ficam reservados na hora, com limites contra reservas de brincadeira.
 - `supabase/presencial-e-pausa.sql`: venda presencial "sem prazo" (não é liberada sozinha) e pausa das vendas pelo painel.
 - `supabase/copia-na-planilha.sql` e `supabase/planilha-apps-script.gs`: cópia automática das vendas numa planilha do Google da Geo (o endereço e a senha da planilha ficam só no banco, na tabela `integracoes`).
+- `supabase/comprovante-e-situacao.sql`: o comprador anexa o comprovante na página (só foto ou PDF, conferido pelo conteúdo do arquivo; só a dona vê), pedido com comprovante não vence sozinho, o comprador vê a situação real do pedido e a página mostra "Reservado" separado de "Vendido". A página percebe sozinha se esse arquivo já rodou: antes disso, continua com o comprovante pelo WhatsApp.
 - `bilhetes/` e `supabase/bilhetes.sql`: fotos dos bilhetes de cada número, cifradas (AES-256-GCM). Quem baixar um arquivo daqui não consegue ver a imagem: a chave fica só no banco (`privado.segredos`) e só a dona logada no painel recebe, pela função `chave_bilhetes()`. O botão "Mandar bilhete no WhatsApp" do painel usa essas fotos.
 - `painel.webmanifest` e `img/icone-*.png`: o painel pode ser instalado como aplicativo no celular.
 - `estado.json`: cópia de reserva da configuração, usada se o banco de dados não responder.

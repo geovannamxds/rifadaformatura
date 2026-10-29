@@ -48,6 +48,7 @@ let estadoPub = {};
 try { estadoPub = JSON.parse($('#estado').textContent || '{}'); } catch (e) { estadoPub = {}; }
 let cfg = Object.assign({}, CFG_PADRAO, estadoPub.cfg || {});
 const ocupadosPub = new Set((estadoPub.ocupados || []).map(Number));
+const reservadosPub = new Set((estadoPub.reservados || []).map(Number));
 let atualizadoPub = estadoPub.atualizado || '';
 
 /* ---------- utilidades ---------- */
@@ -87,7 +88,7 @@ function linkWa(fone, texto) { return 'https://wa.me/' + foneWa(fone) + '?text='
 function diaSemana(iso) { try { return new Date(iso + 'T12:00:00-03:00').toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' }); } catch (e) { return ''; } }
 function prazoDe(v) { const t = Date.parse(v.criadoEm || ''); return new Date((isNaN(t) ? Date.now() : t) + (Number(cfg.prazoReserva) || 24) * 3600000); }
 function liberada(v) { return !!v.liberadaEm && !(v.numeros || []).length; }
-function vencida(v) { return !v.pago && !v.semPrazo && !liberada(v) && Date.now() > prazoDe(v).getTime(); }
+function vencida(v) { return !v.pago && !v.semPrazo && !v.comprovanteEm && !liberada(v) && Date.now() > prazoDe(v).getTime(); }
 function vendasEncerradas() { return Date.now() > new Date(cfg.fimVendas + 'T23:59:59-03:00').getTime(); }
 
 /* faixas de números → universo e blocos de 50 */
@@ -142,11 +143,12 @@ function chavePixNormal() {
   if (cfg.pixTipo === 'celular') { const d = soDigitos(c); return (d.length >= 12 && d.startsWith('55')) ? '+' + d : '+55' + d; }
   return c.toLowerCase();
 }
-function brCode(chave, nome, cidade, valor) {
-  const conta = tlv('00', 'BR.GOV.BCB.PIX') + tlv('01', chave);
+function brCode(chave, nome, cidade, valor, txid, info) {
+  let conta = tlv('00', 'BR.GOV.BCB.PIX') + tlv('01', chave);
+  if (info) conta += tlv('02', info);
   let p = tlv('00', '01') + tlv('01', '11') + tlv('26', conta) + tlv('52', '0000') + tlv('53', '986');
   if (valor > 0) p += tlv('54', valor.toFixed(2));
-  p += tlv('58', 'BR') + tlv('59', nome) + tlv('60', cidade) + tlv('62', tlv('05', '***')) + '6304';
+  p += tlv('58', 'BR') + tlv('59', nome) + tlv('60', cidade) + tlv('62', tlv('05', txid || '***')) + '6304';
   return p + crc16(p);
 }
 function cortarPalavra(s, max) {
@@ -154,12 +156,22 @@ function cortarPalavra(s, max) {
   const corte = s.slice(0, max + 1).lastIndexOf(' ');
   return (corte > 0 ? s.slice(0, corte) : s.slice(0, max)).trim();
 }
-function pixCopiaECola(valor) {
+function pixCopiaECola(valor, pedido) {
   const chave = chavePixNormal();
   const nome = cortarPalavra(semAcento(cfg.pixNome || cfg.vendedora).toUpperCase(), 25);
   if (!chave || !nome) return '';
   const cidade = cortarPalavra((semAcento(cfg.pixCidade) || 'BRASIL').toUpperCase(), 15);
-  return brCode(chave, nome, cidade, valor);
+  let txid = '', info = '';
+  if (pedido && pedido.codigo) {
+    const cod = String(pedido.codigo).replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    txid = ('RIFA' + cod).slice(0, 25);
+    const nums = ordenar((pedido.numeros && pedido.numeros.length) ? pedido.numeros : (pedido.numerosLiberados || []));
+    const cabe = 99 - tlv('00', 'BR.GOV.BCB.PIX').length - tlv('01', chave).length - 4;
+    const longo = 'Pedido ' + cod + ' numeros ' + nums.join(' ');
+    const curto = 'Pedido ' + cod + ' ' + nums.length + (nums.length === 1 ? ' numero' : ' numeros');
+    info = longo.length <= cabe ? longo : (curto.length <= cabe ? curto : '');
+  }
+  return brCode(chave, nome, cidade, valor, txid, info);
 }
 function qrSVG(texto, rotulo) {
   if (typeof window.qrcode !== 'function' || !texto) return '';
@@ -441,7 +453,7 @@ function renderPublico() {
       '<div class="ferramentas"><form id="f-busca" class="busca" role="search"><label for="busca-num" class="sr">Procurar número</label><input id="busca-num" type="text" inputmode="numeric" autocomplete="off" placeholder="Procurar um número"><button class="btn peq" type="submit">Procurar</button></form>' +
       '<button class="btn peq" type="button" data-acao="sorte">Escolher pra mim</button></div>' +
       '<div id="area-grade"></div>' +
-      '<div class="legenda"><span><i class="amostra"></i>Livre</span><span><i class="amostra sel"></i>Escolhido por você</span>' + (TEM_SB && pedidosAtivos().length ? '<span><i class="amostra meu"></i>Reservado pra você</span>' : '') + '<span><i class="amostra ocupado"></i>Já tem dono</span></div>';
+      '<div class="legenda"><span><i class="amostra"></i>Livre</span><span><i class="amostra sel"></i>Escolhido por você</span>' + (TEM_SB && pedidosAtivos().length ? '<span><i class="amostra meu"></i>Seus números</span>' : '') + '<span><i class="amostra res"></i>Reservado</span><span><i class="amostra ocupado"></i>Vendido</span></div>';
   }
   const linhaLivres = aberta
     ? '<p class="dica" id="linha-livres">' + (cfg.mostrarContador ? livres + ' de ' + total + ' números ainda livres. ' : 'Os números riscados já têm dono. ') + (atualizadoPub ? 'Atualizado em ' + fmtQuando(atualizadoPub) + '.' : '') + '</p>'
@@ -514,10 +526,10 @@ function celHTML(n, admin, mapa) {
     st = v ? (v.pago ? 'pago' : 'aguardando') : (ui.sel.has(n) ? 'sel' : 'livre');
     if (v) extra = ', ' + (v.pago ? 'pago' : 'aguardando pagamento') + ', ' + (v.nome || '');
   } else {
-    st = ui.sel.has(n) ? 'sel' : (ocupadosPub.has(n) ? ((TEM_SB && pedidoDoNumero(n)) ? 'meu' : 'ocupado') : 'livre');
+    st = ui.sel.has(n) ? 'sel' : (ocupadosPub.has(n) ? ((TEM_SB && pedidoDoNumero(n)) ? 'meu' : (reservadosPub.has(n) ? 'res' : 'ocupado')) : 'livre');
   }
-  const rot = 'Número ' + n + (st === 'ocupado' ? ', já tem dono' : st === 'meu' ? ', reservado pra você' : st === 'sel' ? ', escolhido' : '') + extra;
-  return '<button type="button" class="cel ' + st + (ui.destaque === n ? ' pisca' : '') + '" data-n="' + n + '" aria-pressed="' + (st === 'sel') + '" aria-label="' + esc(rot) + '"' + (st === 'ocupado' ? ' aria-disabled="true"' : '') + '>' + n + '</button>';
+  const rot = 'Número ' + n + (st === 'ocupado' ? ', vendido' : st === 'res' ? ', reservado pra outra pessoa' : st === 'meu' ? ', seu' : st === 'sel' ? ', escolhido' : '') + extra;
+  return '<button type="button" class="cel ' + st + (ui.destaque === n ? ' pisca' : '') + '" data-n="' + n + '" aria-pressed="' + (st === 'sel') + '" aria-label="' + esc(rot) + '"' + ((st === 'ocupado' || st === 'res') ? ' aria-disabled="true"' : '') + '>' + n + '</button>';
 }
 function renderGrade(admin) {
   const el = $('#area-grade'); if (!el) return;
@@ -670,6 +682,8 @@ function renderAvisos() {
   if (cfg.pausado) h += '<div class="aviso alerta"><div><strong>⏸️ As vendas estão pausadas.</strong><p>Quem abre a página vê os prêmios e o seu aviso, mas não consegue reservar números.</p></div><button class="btn peq ok" type="button" data-acao="retomar">Retomar vendas</button></div>';
   if (!cfg.pronto) h += '<div class="aviso alerta"><div><strong>Falta pouco pra abrir as vendas.</strong><p>Preencha seu WhatsApp e o Pix em Ajustes, confira seus números e salve. Até lá, quem abre o link vê os prêmios e um aviso de “em breve”.</p></div></div>';
   if (erroVendas) h += '<div class="aviso alerta"><p>' + esc(erroVendas) + '</p></div>';
+  const nConf = vendasCarregadas ? vendas.filter(v => !v.pago && !!v.comprovanteEm).length : 0;
+  if (nConf) h += '<div class="aviso alerta"><div><strong>📎 ' + nConf + ' ' + plural(nConf, 'comprovante chegou', 'comprovantes chegaram') + ' pela página.</strong><p>Confira no app do banco se o Pix entrou e toque em “Marcar como pago”. Esses pedidos não vencem sozinhos: esperam você conferir.</p></div><button class="btn peq primario" type="button" data-acao="ver-conferir">Conferir</button></div>';
   const nVenc = vendasCarregadas ? vendas.filter(vencida).length : 0;
   if (nVenc) h += '<div class="aviso alerta"><div><strong>' + nVenc + ' ' + plural(nVenc, 'reserva passou', 'reservas passaram') + ' do prazo de ' + esc(prazoTexto()) + ' sem pagamento.</strong><p>' + (TEM_SB ? 'Os números já aparecem livres pros compradores e saem da venda sozinhos em alguns minutos.' : 'Cobre de novo ou libere os números pra outras pessoas.') + '</p></div><button class="btn peq" type="button" data-acao="ver-vencidas">Ver ' + plural(nVenc, 'reserva', 'reservas') + '</button></div>';
   const nLogo = vendasCarregadas ? vendas.filter(venceLogo).length : 0;
@@ -729,8 +743,8 @@ function renderAba() {
 function renderLista() {
   const el = $('#lista'); if (!el) return;
   const fl = $('#filtros');
-  const nLiberadas = vendas.filter(liberada).length, nLogo = vendas.filter(venceLogo).length, aReceber = vendas.filter(v => !v.pago && !liberada(v)).length, semBilhete = vendas.filter(v => v.pago && !v.bilhete).length, nVenc = vendas.filter(vencida).length;
-  if (fl) fl.innerHTML = [['todas', 'Todas', vendas.length], ['receber', 'A receber', aReceber], ['vencendo', 'Vencendo', nLogo], ['vencidas', 'Reserva vencida', nVenc], ['bilhete', 'Bilhete a enviar', semBilhete], ['liberadas', 'Liberadas', nLiberadas]].filter(f => (f[0] !== 'vencidas' && f[0] !== 'liberadas' && f[0] !== 'vencendo') || f[2] || ui.filtro === f[0])
+  const nLiberadas = vendas.filter(liberada).length, nLogo = vendas.filter(venceLogo).length, aReceber = vendas.filter(v => !v.pago && !liberada(v)).length, nConf = vendas.filter(v => !v.pago && !!v.comprovanteEm).length, semBilhete = vendas.filter(v => v.pago && !v.bilhete).length, nVenc = vendas.filter(vencida).length;
+  if (fl) fl.innerHTML = [['todas', 'Todas', vendas.length], ['receber', 'A receber', aReceber], ['conferir', 'Conferir comprovante', nConf], ['vencendo', 'Vencendo', nLogo], ['vencidas', 'Reserva vencida', nVenc], ['bilhete', 'Bilhete a enviar', semBilhete], ['liberadas', 'Liberadas', nLiberadas]].filter(f => (f[0] !== 'vencidas' && f[0] !== 'liberadas' && f[0] !== 'vencendo' && f[0] !== 'conferir') || f[2] || ui.filtro === f[0])
     .map(f => '<button type="button" class="filtro" data-filtro="' + f[0] + '" aria-pressed="' + (ui.filtro === f[0]) + '">' + f[1] + ' (' + f[2] + ')</button>').join('');
   if (!vendasCarregadas) { el.innerHTML = erroVendas ? '' : '<p class="dica">Carregando…</p>'; return; }
   if (!vendas.length) {
@@ -739,7 +753,7 @@ function renderLista() {
   }
   const q = ui.busca.trim().toLowerCase();
   const arr = vendas.slice()
-    .filter(v => ui.filtro === 'todas' || (ui.filtro === 'receber' ? (!v.pago && !liberada(v)) : ui.filtro === 'vencidas' ? vencida(v) : ui.filtro === 'vencendo' ? venceLogo(v) : ui.filtro === 'liberadas' ? liberada(v) : (v.pago && !v.bilhete)))
+    .filter(v => ui.filtro === 'todas' || (ui.filtro === 'receber' ? (!v.pago && !liberada(v)) : ui.filtro === 'conferir' ? (!v.pago && !!v.comprovanteEm) : ui.filtro === 'vencidas' ? vencida(v) : ui.filtro === 'vencendo' ? venceLogo(v) : ui.filtro === 'liberadas' ? liberada(v) : (v.pago && !v.bilhete)))
     .filter(v => !q || String(v.nome || '').toLowerCase().includes(q) || String(v.codigo || '').toLowerCase() === q.replace(/^#/, '') || (v.numeros || []).concat(v.numerosLiberados || []).some(n => String(n).includes(q)) || soDigitos(v.telefone).includes(soDigitos(q) || '§'))
     .sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')));
   el.innerHTML = arr.length ? arr.map(cardVenda).join('') : '<p class="dica">Nenhuma venda encontrada.</p>';
@@ -751,8 +765,10 @@ function cardLiberada(v) {
     '<div><h3 class="venda-nome">' + esc(v.nome || 'Sem nome') + '</h3>' + (v.telefone ? '<span class="dica">' + esc(foneBonito(v.telefone)) + '</span>' : '') + (v.codigo ? '<span class="dica cod-pedido">Pedido ' + esc(v.codigo) + (v.origem === 'site' ? ' · feito pelo site' : '') + '</span>' : (v.origem === 'presencial' ? '<span class="dica cod-pedido">Venda presencial</span>' : '')) + '</div>' +
     '<div class="chips">' + nums.map(n => '<span class="chip-num riscado">' + n + '</span>').join('') + '</div>' +
     '<p class="dica">Reservou em ' + fmtQuando(v.criadoEm) + ' · liberada em ' + fmtQuando(v.liberadaEm) + ', porque o pagamento não chegou no prazo.</p>' +
+    (v.comprovanteEm && Date.parse(v.comprovanteEm) > Date.parse(v.liberadaEm || 0) ? '<p class="dica erro">📎 A pessoa mandou o comprovante em ' + fmtQuando(v.comprovanteEm) + ', depois do prazo. Confira o Pix e, se entrou, toque em “Recebi o pagamento”.</p>' : '') +
     (v.obs ? '<p class="dica">' + esc(v.obs) + '</p>' : '') +
     '<div class="venda-acoes">' +
+      (v.comprovanteEm ? '<button class="btn peq primario" type="button" data-acao="ver-comprovante" data-venda="' + esc(v.id) + '">Ver comprovante</button>' : '') +
       '<button class="btn peq ok" type="button" data-acao="devolver-pago" data-venda="' + esc(v.id) + '">Recebi o pagamento</button>' +
       '<button class="btn peq" type="button" data-acao="devolver-reserva" data-venda="' + esc(v.id) + '">Reservar de novo</button>' +
       '<button class="btn peq fantasma" type="button" data-acao="editar-venda" data-venda="' + esc(v.id) + '">Editar</button>' +
@@ -774,23 +790,25 @@ function cardVenda(v) {
   const nums = ordenar(v.numeros || []);
   let acoes = '';
   const venc = vencida(v);
+  if (v.comprovanteEm && !v.pago) acoes += '<button class="btn peq primario" type="button" data-acao="ver-comprovante" data-venda="' + esc(v.id) + '">Ver comprovante</button>';
   if (!v.pago) {
     acoes += '<button class="btn peq ok" type="button" data-acao="marcar-pago" data-venda="' + esc(v.id) + '">Marcar como pago</button>' +
       (venc ? '<button class="btn peq perigo" type="button" data-acao="liberar" data-venda="' + esc(v.id) + '">Liberar números</button>' : '') +
       '<a class="btn peq" href="' + esc(linkWa(v.telefone, msgCobranca(v))) + '" target="_blank" rel="noopener">Cobrar no WhatsApp</a>' +
-      (pixCopiaECola(nums.length * cfg.preco) ? '<button class="btn peq" type="button" data-copiar="' + esc(pixCopiaECola(nums.length * cfg.preco)) + '">Copiar Pix desta venda</button>' : '');
+      (pixCopiaECola(nums.length * cfg.preco, v) ? '<button class="btn peq" type="button" data-copiar="' + esc(pixCopiaECola(nums.length * cfg.preco, v)) + '">Copiar Pix desta venda</button>' : '');
   } else if (!v.bilhete) {
     acoes += '<button class="btn peq primario" type="button" data-acao="enviar-bilhete" data-venda="' + esc(v.id) + '">Mandar bilhete no WhatsApp</button>' +
       '<button class="btn peq" type="button" data-acao="marcar-bilhete" data-venda="' + esc(v.id) + '">Já mandei o bilhete</button>';
   } else {
     acoes += '<button class="btn peq" type="button" data-acao="enviar-bilhete" data-venda="' + esc(v.id) + '">Reenviar bilhete</button>';
   }
+  if (v.comprovanteEm && v.pago) acoes += '<button class="btn peq fantasma" type="button" data-acao="ver-comprovante" data-venda="' + esc(v.id) + '">Comprovante</button>';
   acoes += '<button class="btn peq fantasma" type="button" data-acao="editar-venda" data-venda="' + esc(v.id) + '">Editar</button>';
   return '<article class="venda">' +
-    '<div class="venda-topo"><span class="pill ' + (v.pago ? 'pago' : (venc ? 'vencida' : (venceLogo(v) ? 'vencendo' : 'aguardando'))) + '">' + (v.pago ? 'Pago' : (venc ? 'Reserva vencida' : (venceLogo(v) ? '⏰ Vence em ' + faltaTexto(v) : 'Aguardando pagamento'))) + '</span><span class="num">' + brl(nums.length * cfg.preco) + '</span></div>' +
+    '<div class="venda-topo"><span class="pill ' + (v.pago ? 'pago' : (v.comprovanteEm ? 'conferir' : (venc ? 'vencida' : (venceLogo(v) ? 'vencendo' : 'aguardando')))) + '">' + (v.pago ? 'Pago' : (v.comprovanteEm ? '📎 Conferir comprovante' : (venc ? 'Reserva vencida' : (venceLogo(v) ? '⏰ Vence em ' + faltaTexto(v) : 'Aguardando pagamento')))) + '</span><span class="num">' + brl(nums.length * cfg.preco) + '</span></div>' +
     '<div><h3 class="venda-nome">' + esc(v.nome || 'Sem nome') + '</h3>' + (v.telefone ? '<span class="dica">' + esc(foneBonito(v.telefone)) + '</span>' : '') + (v.codigo ? '<span class="dica cod-pedido">Pedido ' + esc(v.codigo) + (v.origem === 'site' ? ' · feito pelo site' : '') + '</span>' : (v.origem === 'presencial' ? '<span class="dica cod-pedido">Venda presencial</span>' : '')) + '</div>' +
     '<div class="chips">' + nums.map(n => '<span class="chip-num">' + n + '</span>').join('') + '</div>' +
-    (v.pago ? '<p class="dica">' + (v.bilhete ? 'Bilhete enviado' : 'Bilhete ainda não enviado') + '</p>' : (v.semPrazo ? '<p class="dica">Reservado em ' + fmtQuando(v.criadoEm) + ' · sem prazo, combinado com você</p>' : '<p class="dica' + (venc ? ' erro' : '') + '">Reservado em ' + fmtQuando(v.criadoEm) + ' · ' + (venc ? 'o prazo acabou em ' : 'pagar até ') + fmtQuando(prazoDe(v).toISOString()) + '</p>')) +
+    htmlLinhaTempo(v, venc) +
     (v.obs ? '<p class="dica">' + esc(v.obs) + '</p>' : '') +
     '<div class="venda-acoes">' + acoes + '</div></article>';
 }
@@ -1117,6 +1135,9 @@ document.addEventListener('click', e => {
     case 'csv': baixarCSV(); break;
     case 'pausar': abrirPausa(); break;
     case 'enviar-bilhete': abrirEnvioBilhete(id); break;
+    case 'ver-comprovante': abrirComprovantes(id); break;
+    case 'comp-pago': fecharFolha(); atualizarVenda(id, { pago: true, pagoEm: new Date().toISOString() }, 'Marcado como pago'); break;
+    case 'ver-conferir': ui.aba = 'vendas'; ui.filtro = 'conferir'; renderAba(); { const l = $('#lista'); if (l) l.scrollIntoView({ block: 'start' }); } break;
     case 'bil-lote': mandarLoteBilhetes(Number(t.dataset.lote)); break;
     case 'bil-tentar': carregarFotosEnvio(); break;
     case 'bil-pronto': fecharFolha(); atualizarVenda(id, { bilhete: true }, 'Bilhete marcado como enviado'); break;
@@ -1149,7 +1170,7 @@ document.addEventListener('submit', e => {
   if (!v) return;
   if (!UNI_SET.has(v)) { toast('O ' + v + ' não está entre os meus números. Os meus são: ' + faixasTexto() + '.'); return; }
   irPara(v);
-  if (ocupadosPub.has(v)) toast('O ' + v + ' já tem dono. Escolha outro.');
+  if (ocupadosPub.has(v)) toast(textoOcupado(v));
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && ui.folha) fecharFolha(); });
 
@@ -1160,7 +1181,7 @@ function tocarNumero(n) {
   } else {
     const meu = TEM_SB ? pedidoDoNumero(n) : null;
     if (meu) { toast('O ' + n + ' está reservado pra você (pedido ' + meu.codigo + ').'); return; }
-    if (ocupadosPub.has(n)) { toast('O ' + n + ' já tem dono. Escolha outro.'); return; }
+    if (ocupadosPub.has(n)) { toast(textoOcupado(n)); return; }
     if (!cfg.pronto || vendasEncerradas() || cfg.pausado) return;
     if (TEM_SB && !ui.sel.has(n) && ui.sel.size >= MAX_POR_PEDIDO) { toast('Cada pedido vai até ' + MAX_POR_PEDIDO + ' números. Finalize este e faça outro depois.'); return; }
   }
@@ -1239,10 +1260,10 @@ if (TEM_SB && PAGINA !== 'admin') {
    Versão do site (GitHub Pages) com banco de dados no Supabase
    ===================================================================== */
 const SB_TABELA = 'vendas';
-const CAMPOS_VENDA = { nome: 'nome', telefone: 'telefone', numeros: 'numeros', pago: 'pago', bilhete: 'bilhete', obs: 'obs', criadoEm: 'criado_em', atualizadoEm: 'atualizado_em', pagoEm: 'pago_em', liberadaEm: 'liberada_em', numerosLiberados: 'numeros_liberados', codigo: 'codigo', origem: 'origem', semPrazo: 'sem_prazo' };
+const CAMPOS_VENDA = { nome: 'nome', telefone: 'telefone', numeros: 'numeros', pago: 'pago', bilhete: 'bilhete', obs: 'obs', criadoEm: 'criado_em', atualizadoEm: 'atualizado_em', pagoEm: 'pago_em', liberadaEm: 'liberada_em', numerosLiberados: 'numeros_liberados', codigo: 'codigo', origem: 'origem', semPrazo: 'sem_prazo', comprovanteEm: 'comprovante_em' };
 function paraLinha(d) {
   const r = {};
-  Object.keys(CAMPOS_VENDA).forEach(k => { if (k in d) r[CAMPOS_VENDA[k]] = d[k]; });
+  Object.keys(CAMPOS_VENDA).forEach(k => { if (k in d && d[k] !== undefined) r[CAMPOS_VENDA[k]] = d[k]; });
   if (r.numeros) r.numeros = r.numeros.map(Number);
   if (r.numeros_liberados) r.numeros_liberados = r.numeros_liberados.map(Number);
   return r;
@@ -1333,8 +1354,8 @@ function downloadsNavegador() {
 /* página pública e painel usam a mesma lista de números ocupados */
 function sincronizarPublico() {
   if (!vendasCarregadas) return;
-  ocupadosPub.clear();
-  vendas.forEach(v => { if (!vencida(v)) (v.numeros || []).forEach(n => ocupadosPub.add(Number(n))); });
+  ocupadosPub.clear(); reservadosPub.clear();
+  vendas.forEach(v => { if (!vencida(v)) (v.numeros || []).forEach(n => { ocupadosPub.add(Number(n)); if (!v.pago) reservadosPub.add(Number(n)); }); });
   atualizadoPub = new Date().toISOString();
 }
 
@@ -1456,10 +1477,14 @@ function textoLivres() {
   return (cfg.mostrarContador ? livres + ' de ' + UNI.length + ' números ainda livres. ' : 'Os números riscados já têm dono. ') + (atualizadoPub ? 'Atualizado em ' + fmtQuando(atualizadoPub) + '.' : '');
 }
 function aplicarEstado(e) {
+  /* o banco já tem comprovante pelo site e situação do pedido? (estado_publico novo manda 'reservados') */
+  if (e && Array.isArray(e.reservados) && !servidorNovo) { servidorNovo = true; renderMeusPedidos(); setTimeout(sincronizarMeusPedidos, 50); }
   const cfgNovo = Object.assign({}, CFG_PADRAO, e.cfg);
   const mudouCfg = JSON.stringify(cfgNovo) !== JSON.stringify(cfg);
   const novos = new Set((e.ocupados || []).map(Number));
-  const mudouOcup = novos.size !== ocupadosPub.size || Array.from(novos).some(n => !ocupadosPub.has(n));
+  const novosRes = new Set((e.reservados || []).map(Number));
+  const mudouOcup = novos.size !== ocupadosPub.size || Array.from(novos).some(n => !ocupadosPub.has(n)) ||
+    novosRes.size !== reservadosPub.size || Array.from(novosRes).some(n => !reservadosPub.has(n));
   const linha = $('#linha-livres');
   if (!mudouCfg && !mudouOcup) { if (e.atualizado) atualizadoPub = e.atualizado; if (linha) linha.textContent = textoLivres(); return; }
   const sobraLivre = lerFaixas(cfgNovo.faixas).nums.some(n => !novos.has(n));
@@ -1468,6 +1493,7 @@ function aplicarEstado(e) {
   if (e.atualizado) atualizadoPub = e.atualizado;
   cfg = cfgNovo;
   ocupadosPub.clear(); novos.forEach(n => ocupadosPub.add(n));
+  reservadosPub.clear(); novosRes.forEach(n => reservadosPub.add(n));
   const perdidos = Array.from(ui.sel).filter(n => ocupadosPub.has(n));
   perdidos.forEach(n => ui.sel.delete(n));
   definirUniverso();
@@ -1498,14 +1524,13 @@ function lerPedidosLocais() {
   try { const a = JSON.parse(localStorage.getItem('rifa-pedidos') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
 }
 function gravarPedidosLocais(lista) {
-  try { localStorage.setItem('rifa-pedidos', JSON.stringify(lista.slice(-6))); } catch (e) { /* sem armazenamento */ }
+  try { localStorage.setItem('rifa-pedidos', JSON.stringify(lista.slice(-12))); } catch (e) { /* sem armazenamento */ }
 }
-function pedidosAtivos() {
-  const agora = Date.now();
-  return lerPedidosLocais().filter(p => p && p.codigo && Date.parse(p.prazo) > agora);
-}
+/* pedidos que seguram números (aguardando no prazo, comprovante enviado ou pago) */
+function pedidosAtivos() { return lerPedidosLocais().filter(pedidoSeguraNumeros); }
 function salvarPedidoLocal(p) {
-  const lista = lerPedidosLocais().filter(x => x && x.codigo !== p.codigo && Date.parse(x.prazo) > Date.now() - 7 * 86400000);
+  const lista = lerPedidosLocais().filter(x => x && x.codigo !== p.codigo && x.situacao !== 'sumiu' &&
+    (situacaoDe(x) === 'pago' || situacaoDe(x) === 'comprovante' || Date.parse(x.prazo) > Date.now() - 7 * 86400000));
   lista.push(p); gravarPedidosLocais(lista);
 }
 function marcarPedidoLocal(codigo, campos) {
@@ -1516,13 +1541,29 @@ function pedidoDoNumero(n) {
 }
 function htmlMeusPedidos() {
   if (!TEM_SB) return '';
-  const ps = pedidosAtivos();
+  const ps = lerPedidosLocais().filter(pedidoVisivel);
   if (!ps.length) return '';
-  return '<div class="meus-pedidos">' + ps.map(p =>
-    '<div class="meu-pedido"><div><strong>Seu pedido ' + esc(p.codigo) + '</strong> · ' + esc(listaNums(p.numeros || [])) + ' · <span class="num">' + brl((p.numeros || []).length * cfg.preco) + '</span>' +
-      '<br><span class="dica">' + (p.enviado ? 'Comprovante enviado. Assim que eu confirmar, te mando o bilhete 💛' : 'Reservado até ' + fmtQuando(p.prazo) + '. Falta pagar e me mandar o comprovante.') + '</span></div>' +
-      '<button class="btn peq' + (p.enviado ? '' : ' primario') + '" type="button" data-acao="ver-pedido" data-codigo="' + esc(p.codigo) + '">' + (p.enviado ? 'Ver pedido' : 'Pagar') + '</button></div>'
-  ).join('') + '</div>';
+  return '<div class="meus-pedidos">' + ps.map(p => {
+    const s = situacaoDe(p), nums = p.numeros || [];
+    let txt, botao = '';
+    if (s === 'pago') {
+      txt = '✅ <strong>Pagamento confirmado!</strong> ' + (p.bilhete ? 'O bilhete já foi pro seu WhatsApp. Boa sorte! 🍀' : 'Já já te mando o bilhete no WhatsApp.');
+    } else if (s === 'comprovante') {
+      txt = '📎 <strong>Comprovante enviado.</strong> Agora é comigo: eu confiro o pagamento e marco aqui. Seus números ficam guardados pra você até lá.';
+      botao = '<button class="btn peq" type="button" data-acao="ver-pedido" data-codigo="' + esc(p.codigo) + '">Ver pedido</button>';
+    } else if (s === 'liberado') {
+      txt = '⏳ A reserva venceu antes do pagamento e os números voltaram a ficar livres. Já pagou? Anexe o comprovante que eu confiro.';
+      botao = '<button class="btn peq" type="button" data-acao="ver-pedido" data-codigo="' + esc(p.codigo) + '">Ver pedido</button>';
+    } else {
+      txt = (p.enviado ? 'Você me mandou o comprovante pelo WhatsApp. Eu confiro cada pagamento manualmente: assim que eu conferir, te mando o bilhete. ' : 'Reservado até ' + fmtQuando(p.prazo) + '. Falta pagar e ' + (servidorNovo ? 'anexar o comprovante.' : 'me mandar o comprovante.'));
+      botao = '<button class="btn peq' + (p.enviado ? '' : ' primario') + '" type="button" data-acao="ver-pedido" data-codigo="' + esc(p.codigo) + '">' + (p.enviado ? 'Ver pedido' : 'Pagar') + '</button>';
+    }
+    return '<div class="meu-pedido ' + s + '"><div><strong>Seu pedido ' + esc(p.codigo) + '</strong> · ' + esc(listaNums(nums)) + ' · <span class="num">' + brl(nums.length * cfg.preco) + '</span>' +
+      '<br><span class="dica">' + txt + '</span></div>' + botao + '</div>';
+  }).join('') + '</div>';
+}
+function msgSemReserva(nums) {
+  return 'Oi, ' + cfg.vendedora + '! Tentei reservar pela página os números ' + listaNums(nums) + ', mas não consegui. Pode reservar pra mim? 😊';
 }
 function renderMeusPedidos() { const el = $('#meus-pedidos'); if (el) el.innerHTML = htmlMeusPedidos(); }
 
@@ -1539,15 +1580,18 @@ function htmlEtapas(atual) {
 function abrirCheckout(erroMsg, comAlternativa) {
   const nums = ordenar(ui.sel);
   if (!nums.length) { fecharFolha(); return; }
+  /* quem já fez pedido neste aparelho não precisa digitar nome e WhatsApp de novo */
+  const ultimo = lerPedidosLocais().filter(x => x && x.nome).slice(-1)[0];
+  if (ultimo && !ui.nomeComprador && !ui.foneComprador) { ui.nomeComprador = ultimo.nome; ui.foneComprador = ultimo.fone ? foneBonito(ultimo.fone) : ''; }
   abrirFolha('pedido',
     '<div class="folha-cab">' + cabFolha('<span class="tit-carrinho">' + ICONE_CARRINHO + '</span>Seu pedido') + htmlChipsPedido(nums, true) + '</div><div class="perfura" aria-hidden="true"></div>' +
     '<form class="folha-corpo" id="f-checkout" novalidate>' + htmlEtapas(1) +
       '<div class="campo"><label for="p-nome">Seu nome</label><input id="p-nome" type="text" autocomplete="name" placeholder="Nome e sobrenome" value="' + esc(ui.nomeComprador || '') + '"></div>' +
       '<div class="campo"><label for="p-fone">Seu WhatsApp, com DDD</label><input id="p-fone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(41) 99999-0000" value="' + esc(ui.foneComprador || '') + '"><p class="dica">É por ele que eu confirmo o pagamento e te mando o bilhete.</p></div>' +
       '<p class="erro" id="p-erro" role="alert"' + (erroMsg ? '' : ' hidden') + '>' + esc(erroMsg || '') + '</p>' +
-      (comAlternativa ? '<p class="dica">Se continuar sem funcionar, <button class="link" type="button" data-acao="pedido-whats">mande o pedido direto no meu WhatsApp</button>.</p>' : '') +
+      (comAlternativa && cfg.whatsapp ? '<p class="dica">Se precisar, <a class="link" href="' + esc(linkWa(cfg.whatsapp, msgSemReserva(nums))) + '" target="_blank" rel="noopener">me chama no WhatsApp</a> que eu vejo com você. Só pague depois que os números estiverem reservados.</p>' : '') +
       '<button class="btn primario largo" type="submit" id="p-reservar">Gerar Pix e reservar</button>' +
-      '<p class="nota">⏳ Quando você gera o Pix, os números ficam reservados pra você por ' + esc(prazoTexto()) + '. Se o pagamento não chegar nesse prazo, eles voltam a ficar livres.</p>' +
+      '<p class="nota">⏳ Quando você gera o Pix, os números ficam reservados pra você por ' + esc(prazoTexto()) + '. Se o comprovante não chegar nesse prazo, eles voltam a ficar livres.<br>📌 Cada WhatsApp pode ter até ' + LIMITE_PEDIDOS_ABERTOS + ' pedidos de até ' + MAX_POR_PEDIDO + ' números esperando a minha confirmação do pagamento.</p>' +
       '<p class="dica lgpd">🔒 Seu nome e seu WhatsApp ficam só comigo, pra confirmar a compra e te mandar o bilhete.</p>' +
     '</form>');
   const nome = $('#p-nome'), fone = $('#p-fone');
@@ -1599,8 +1643,8 @@ function tratarErroReserva(msg) {
     return;
   }
   const T = {
-    limite_whatsapp: 'Esse WhatsApp já tem 2 pedidos esperando pagamento. Pague um deles ou fale comigo no WhatsApp.',
-    limite_conexao: 'Já tem vários pedidos esperando pagamento feitos daqui. Pague um deles ou fale comigo no WhatsApp.',
+    limite_whatsapp: 'Esse WhatsApp já tem ' + LIMITE_PEDIDOS_ABERTOS + ' pedidos esperando a minha confirmação do pagamento. Dá pra ter até ' + LIMITE_PEDIDOS_ABERTOS + ' pedidos de até ' + MAX_POR_PEDIDO + ' números esperando ao mesmo tempo: assim que eu confirmar um deles, você consegue fazer outro.',
+    limite_conexao: 'Já tem vários pedidos feitos desta internet esperando a minha confirmação do pagamento. Assim que eu confirmar algum, dá pra fazer outro.',
     muitos_pedidos: 'Muita gente fazendo pedido agora! Tente de novo daqui a alguns minutos.',
     muitos_numeros: 'Cada pedido vai até ' + MAX_POR_PEDIDO + ' números. Tire alguns e faça outro pedido depois.',
     numero_fora: 'Algum desses números não está mais à venda. Recarregue a página e escolha de novo.',
@@ -1614,10 +1658,13 @@ function tratarErroReserva(msg) {
   if (chave) { reabrir(T[chave], chave === 'limite_whatsapp' || chave === 'limite_conexao' || chave === 'muitos_pedidos'); return; }
   reabrir(msg === 'rede' ? 'Não consegui falar com o sistema agora. Confira a internet e tente de novo.' : 'Não consegui reservar agora. Tente de novo em instantes.', true);
 }
-function htmlPixPedido(total, rotuloId) {
+function htmlPixPedido(total, rotuloId, pedido) {
   if (!cfg.pixChave) return '';
-  const cc = pixCopiaECola(total);
+  const cc = pixCopiaECola(total, pedido);
+  const outros = lerPedidosLocais().filter(x => pedidoVisivel(x) && situacaoDe(x) === 'aguardando' && (!pedido || x.codigo !== pedido.codigo)).length;
   return '<li><h3>Pague por Pix</h3>' +
+    '<p class="pix-valor">Valor deste pedido: <strong class="num">' + brl(total) + '</strong></p>' +
+    '<p class="dica">Confira se o app do banco mostra ' + brl(total) + ' antes de confirmar.' + (outros ? ' Você tem outro pedido esperando: pague cada um com o Pix do próprio pedido.' : '') + '</p>' +
     '<p class="dica">Chave Pix (' + ROTULO_PIX[cfg.pixTipo] + ')' + (cfg.pixNome ? ' · em nome de ' + esc(cfg.pixNome) : '') + '</p>' +
     '<div class="copia"><code>' + esc(cfg.pixChave) + '</code><button class="btn peq" type="button" data-copiar="' + esc(cfg.pixChave) + '">Copiar chave</button></div>' +
     (cc ? '<p class="dica">Ou use o Pix copia e cola, que já vem com o valor de ' + brl(total) + ':</p><div class="copia-cc"><textarea id="' + rotuloId + '" class="cc-campo" readonly rows="4" aria-label="Código Pix copia e cola">' + esc(cc) + '</textarea><button class="btn peq" type="button" data-copiar="' + esc(cc) + '" data-alvo="' + rotuloId + '">Copiar código</button></div>' : '') +
@@ -1627,18 +1674,45 @@ function htmlPixPedido(total, rotuloId) {
 function abrirPagamento(p) {
   const nums = ordenar(p.numeros || []);
   const total = nums.length * cfg.preco;
-  abrirFolha('pagamento',
-    '<div class="folha-cab">' + cabFolha('Pedido ' + esc(p.codigo)) +
-      '<p class="reservado">✅ Números reservados pra você até <strong>' + fmtQuando(p.prazo) + '</strong></p>' + htmlChipsPedido(nums, false) +
-    '</div><div class="perfura" aria-hidden="true"></div>' +
-    '<div class="folha-corpo">' + htmlEtapas(2) +
-      '<ol class="passos">' + htmlPixPedido(total, 'pix-cc-pedido') +
-        '<li><h3>Me mande o comprovante</h3><p>Depois de pagar, toque no botão: o WhatsApp abre com o seu pedido pronto. É só anexar o comprovante do Pix.</p>' +
-          '<a class="btn primario largo" id="p-comprovante" href="' + esc(linkWa(cfg.whatsapp, msgPedido(p.nome, nums, p.codigo))) + '" target="_blank" rel="noopener" data-acao="mandou-comprovante" data-codigo="' + esc(p.codigo) + '">Já paguei: mandar comprovante</a>' +
-          '<p class="dica">Se o WhatsApp não abrir, mande o comprovante pro número <span class="num">' + esc(foneBonito(cfg.whatsapp)) + '</span> com o código <strong>' + esc(p.codigo) + '</strong> · <button class="link" type="button" data-copiar="' + esc(soDigitos(cfg.whatsapp)) + '">copiar número</button></p></li>' +
+  const s = situacaoDe(p);
+  ui.pedidoAberto = p.codigo; ui.pedidoAbertoSit = s;
+  const avisarWa = cfg.whatsapp ? linkWa(cfg.whatsapp, msgPedido(p.nome, nums, p.codigo)) : '';
+  let topo, corpo;
+  if (s === 'pago') {
+    topo = '<p class="reservado">✅ Pagamento confirmado' + (p.pagoEm ? ' em <strong>' + fmtQuando(p.pagoEm) + '</strong>' : '') + '</p>';
+    corpo = '<p>Muito obrigada pela ajuda! 💛 ' + (p.bilhete ? 'O bilhete digital de cada número já foi pro seu WhatsApp.' : 'Já já te mando o bilhete digital de cada número pelo WhatsApp.') + '</p>' +
+      '<p class="nota">O sorteio é dia ' + esc(dataBR(cfg.sorteio)) + ', ao vivo no ' + esc(cfg.instagram || 'Instagram da Formô') + '. Boa sorte! 🍀</p>';
+  } else if (s === 'comprovante') {
+    topo = '<p class="reservado">📎 Comprovante recebido' + (p.comprovanteEm ? ' em <strong>' + fmtQuando(p.comprovanteEm) + '</strong>' : '') + '</p>';
+    corpo = '<div class="comprovante-ok"><h3>Recebi seu comprovante! 💛</h3>' +
+        '<p>Agora é comigo: eu confiro cada pagamento manualmente e marco aqui. Quando eu confirmar, seu pedido aparece como <strong>“Pagamento confirmado”</strong> e te mando o bilhete digital de cada número pelo WhatsApp.</p>' +
+        '<p class="dica">Seus números ficam guardados pra você enquanto eu confiro. Não precisa fazer outro pedido.</p></div>' +
+      (avisarWa ? '<a class="btn largo" href="' + esc(avisarWa) + '" target="_blank" rel="noopener">Me avisar no WhatsApp (opcional)</a>' : '') +
+      '<p class="dica">Mandou o arquivo errado? ' + htmlAnexar(p, 'Anexar outro comprovante', 'link') + '</p><p class="erro" id="p-arq-erro" role="alert" hidden></p>';
+  } else if (s === 'liberado') {
+    topo = '<p class="reservado vencido">⏳ A reserva venceu antes do pagamento</p>';
+    corpo = '<p>O prazo de ' + esc(prazoTexto()) + ' passou e os números voltaram a ficar livres. Se você já pagou, anexe o comprovante: eu confiro e, se os números ainda estiverem livres, devolvo pra você.</p>' +
+      htmlAnexar(p) + '<p class="erro" id="p-arq-erro" role="alert" hidden></p>' +
+      (avisarWa ? '<p class="dica">Ou <a class="link" href="' + esc(avisarWa) + '" target="_blank" rel="noopener">fale comigo no WhatsApp</a>.</p>' : '');
+  } else {
+    topo = '<p class="reservado">✅ Números reservados pra você até <strong>' + fmtQuando(p.prazo) + '</strong></p>';
+    corpo = htmlEtapas(2) +
+      '<ol class="passos">' + htmlPixPedido(total, 'pix-cc-pedido', p) +
+        (servidorNovo
+          ? '<li><h3>Anexe o comprovante</h3><p>Depois de pagar, anexe aqui o print ou o PDF do comprovante do Pix. É assim que o seu pedido fica guardado enquanto eu confiro.</p>' +
+            htmlAnexar(p) + '<p class="erro" id="p-arq-erro" role="alert" hidden></p>' +
+            (avisarWa ? '<p class="dica">Prefere mandar pelo WhatsApp? <a class="link" href="' + esc(avisarWa) + '" target="_blank" rel="noopener" data-acao="mandou-comprovante" data-codigo="' + esc(p.codigo) + '">Mandar no WhatsApp</a>' + (cfg.whatsapp ? ' (' + esc(foneBonito(cfg.whatsapp)) + ', com o código <strong>' + esc(p.codigo) + '</strong>)' : '') + '.</p>' : '')
+          : '<li><h3>Me mande o comprovante</h3><p>Depois de pagar, toque no botão: o WhatsApp abre com o seu pedido pronto. É só anexar o comprovante do Pix.</p>' +
+            (avisarWa ? '<a class="btn primario largo" href="' + esc(avisarWa) + '" target="_blank" rel="noopener" data-acao="mandou-comprovante" data-codigo="' + esc(p.codigo) + '">Já paguei: mandar comprovante</a>' +
+              '<p class="dica">Se o WhatsApp não abrir, mande o comprovante pro número <span class="num">' + esc(foneBonito(cfg.whatsapp)) + '</span> com o código <strong>' + esc(p.codigo) + '</strong> · <button class="link" type="button" data-copiar="' + esc(soDigitos(cfg.whatsapp)) + '">copiar número</button></p>' : '')) +
+        '</li>' +
       '</ol>' +
-      '<p class="nota">Assim que eu confirmar o pagamento, te mando o bilhete digital de cada número pelo WhatsApp. Se fechar esta janela, o pedido continua aqui na página, no aviso “Seu pedido”. 💛</p>' +
-    '</div>');
+      '<p class="nota">Eu confiro cada pagamento manualmente, então pode levar um tempinho pra aparecer como pago. Quando eu confirmar, aparece “Pagamento confirmado” no seu pedido e te mando o bilhete digital de cada número pelo WhatsApp. Se fechar esta janela, o pedido continua aqui na página, no aviso “Seu pedido”. 💛</p>';
+  }
+  abrirFolha('pagamento',
+    '<div class="folha-cab">' + cabFolha('Pedido ' + esc(p.codigo)) + topo + htmlChipsPedido(nums, false) + '</div>' +
+    '<div class="perfura" aria-hidden="true"></div><div class="folha-corpo">' + corpo + '</div>');
+  ligarAnexos();
 }
 function verPedido(codigo) {
   const p = lerPedidosLocais().find(x => x && x.codigo === codigo);
@@ -1649,7 +1723,7 @@ function verPedido(codigo) {
    Reservas quase vencendo (painel)
    ===================================================================== */
 function venceLogo(v) {
-  if (v.pago || v.semPrazo || liberada(v) || vencida(v) || !(v.numeros || []).length) return false;
+  if (v.pago || v.comprovanteEm || v.semPrazo || liberada(v) || vencida(v) || !(v.numeros || []).length) return false;
   return prazoDe(v).getTime() - Date.now() <= 3 * 3600000;
 }
 function faltaTexto(v) {
@@ -2125,6 +2199,236 @@ function baixarArquivos(arqs) {
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   }, k * 300));
+}
+
+
+/* =====================================================================
+   Comprovante pelo site, situação real do pedido e números reservados
+   ===================================================================== */
+const LIMITE_PEDIDOS_ABERTOS = 2;
+/* o comprovante pelo site e a situação do pedido só ligam quando o banco já tem essas funções */
+let servidorNovo = false;
+
+function textoOcupado(n) {
+  return reservadosPub.has(n) ? 'O ' + n + ' está reservado pra outra pessoa. Escolha outro.' : 'O ' + n + ' já foi vendido. Escolha outro.';
+}
+
+/* ---------- pedidos deste aparelho: o que aparece e o que segura números ---------- */
+function situacaoDe(p) { return (p && p.situacao) || 'aguardando'; }
+function pedidoVisivel(p) {
+  if (!p || !p.codigo || p.situacao === 'sumiu') return false;
+  const s = situacaoDe(p);
+  if (s === 'aguardando') return Date.parse(p.prazo) > Date.now();
+  if (s === 'comprovante' || s === 'pago') return true;
+  if (s === 'liberado') return Date.now() - Date.parse(p.criado || 0) < 3 * 86400000;
+  return false;
+}
+function pedidoSeguraNumeros(p) { return pedidoVisivel(p) && situacaoDe(p) !== 'liberado'; }
+
+/* ---------- pergunta ao sistema a situação de cada pedido ---------- */
+let sincronizando = false, ultimaSinc = 0;
+async function sincronizarMeusPedidos() {
+  if (!TEM_SB || !servidorNovo || sincronizando) return;
+  const locais = lerPedidosLocais().filter(p => p && p.codigo && p.fone);
+  if (!locais.length) return;
+  sincronizando = true;
+  try {
+    const r = await fetch(SB_CFG.url.replace(/\/+$/, '') + '/rest/v1/rpc/situacao_pedidos', {
+      method: 'POST', cache: 'no-store',
+      headers: { apikey: SB_CFG.chave, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ p_pedidos: locais.slice(-12).map(p => ({ codigo: p.codigo, fone: p.fone })) })
+    });
+    if (!r.ok) return;
+    const lista = await r.json();
+    if (!Array.isArray(lista)) return;
+    ultimaSinc = Date.now();
+    const porCod = new Map(lista.map(x => [String(x.codigo), x]));
+    const perguntados = new Set(locais.slice(-12).map(p => p.codigo));
+    let mudou = false;
+    const novos = lerPedidosLocais().map(p => {
+      if (!p || !p.codigo || !p.fone || !perguntados.has(p.codigo)) return p;
+      const s = porCod.get(p.codigo);
+      const n = s ? Object.assign({}, p, {
+        situacao: s.situacao,
+        numeros: ((s.numeros && s.numeros.length) ? s.numeros : ((s.liberados && s.liberados.length) ? s.liberados : (p.numeros || []))).map(Number),
+        prazo: s.prazo || p.prazo,
+        pagoEm: s.pago_em || null,
+        comprovanteEm: s.comprovante_em || null,
+        bilhete: !!s.bilhete,
+        enviado: !!p.enviado || s.situacao === 'comprovante' || s.situacao === 'pago'
+      }) : Object.assign({}, p, { situacao: 'sumiu' });
+      if (JSON.stringify(n) !== JSON.stringify(p)) mudou = true;
+      return n;
+    });
+    if (!mudou) return;
+    gravarPedidosLocais(novos);
+    renderMeusPedidos();
+    if (ui.modo === 'publico' && $('#area-grade')) { renderGrade(false); }
+    if (ui.folha === 'pagamento' && ui.pedidoAberto) {
+      const p = novos.find(x => x && x.codigo === ui.pedidoAberto);
+      if (p && situacaoDe(p) !== ui.pedidoAbertoSit) abrirPagamento(p);
+    }
+  } catch (e) { /* tenta de novo depois */ }
+  finally { sincronizando = false; }
+}
+function temPedidoEsperando() { return lerPedidosLocais().some(p => pedidoVisivel(p) && (situacaoDe(p) === 'aguardando' || situacaoDe(p) === 'comprovante')); }
+if (TEM_SB && PAGINA === 'publico') {
+  setTimeout(sincronizarMeusPedidos, 1200);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - ultimaSinc > 15000) sincronizarMeusPedidos(); });
+  setInterval(() => { if (document.visibilityState === 'visible' && temPedidoEsperando()) sincronizarMeusPedidos(); }, 45000);
+}
+
+/* ---------- comprovante: foto vira JPEG leve; PDF vai como está ---------- */
+function carregarImagem(file) {
+  return new Promise((ok, falha) => {
+    const url = URL.createObjectURL(file);
+    const im = new Image();
+    im.onload = () => { ok(im); setTimeout(() => URL.revokeObjectURL(url), 2000); };
+    im.onerror = () => { URL.revokeObjectURL(url); falha(new Error('imagem')); };
+    im.src = url;
+  });
+}
+async function prepararComprovante(file) {
+  if (!file) throw new Error('vazio');
+  const nome = String(file.name || '').toLowerCase();
+  if (file.type === 'application/pdf' || /\.pdf$/.test(nome)) {
+    if (file.size > 3 * 1024 * 1024) throw new Error('pdf_grande');
+    return { tipo: 'application/pdf', blob: file };
+  }
+  if (file.type && file.type.indexOf('image/') !== 0) throw new Error('tipo');
+  const img = await carregarImagem(file);
+  const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  if (!w || !h) throw new Error('imagem');
+  const k = Math.min(1, 1800 / Math.max(w, h));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+  const g = c.getContext('2d');
+  g.fillStyle = '#FFFFFF'; g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(img, 0, 0, c.width, c.height);
+  let q = .85, blob = null;
+  do { blob = await new Promise(r => c.toBlob(r, 'image/jpeg', q)); q -= .15; } while (blob && blob.size > 2.5 * 1024 * 1024 && q > .3);
+  if (!blob) throw new Error('imagem');
+  return { tipo: 'image/jpeg', blob };
+}
+function paraBase64(blob) {
+  return new Promise((ok, falha) => {
+    const fr = new FileReader();
+    fr.onload = () => ok(String(fr.result).split(',')[1] || '');
+    fr.onerror = () => falha(fr.error || new Error('leitura'));
+    fr.readAsDataURL(blob);
+  });
+}
+const ERROS_COMPROVANTE = {
+  pdf_grande: 'Esse PDF é muito grande. Mande um print do comprovante.',
+  tipo: 'Anexe um print (foto) ou o PDF do comprovante do Pix.',
+  imagem: 'Não consegui abrir essa imagem. Tire um print do comprovante e anexe o print.',
+  pedido_nao_encontrado: 'Não achei esse pedido no sistema. Me manda o comprovante pelo WhatsApp, por favor.',
+  arquivo_invalido: 'Esse arquivo não parece um print nem um PDF. Anexe o comprovante do Pix.',
+  arquivo_grande: 'Arquivo muito grande. Mande um print do comprovante.',
+  muitos_comprovantes: 'Você já mandou vários comprovantes desse pedido. Se precisar, fala comigo no WhatsApp.',
+  rede: 'Não consegui enviar agora. Confira a internet e tente de novo.'
+};
+async function enviarComprovante(codigo, input) {
+  const p = lerPedidosLocais().find(x => x && x.codigo === codigo);
+  const file = input.files && input.files[0];
+  if (!p || !file) return;
+  const rot = input.closest('label');
+  const texto = rot ? rot.querySelector('.anexar-txt') : null;
+  const antes = texto ? texto.textContent : '';
+  const err = $('#p-arq-erro');
+  const mostra = m => { if (err) { err.textContent = m; err.hidden = !m; } else if (m) toast(m); };
+  mostra('');
+  if (rot) rot.classList.add('enviando');
+  if (texto) texto.textContent = 'Enviando o comprovante…';
+  input.disabled = true;
+  try {
+    const a = await prepararComprovante(file);
+    const b64 = await paraBase64(a.blob);
+    let r, corpo;
+    try {
+      r = await fetch(SB_CFG.url.replace(/\/+$/, '') + '/rest/v1/rpc/enviar_comprovante', {
+        method: 'POST', cache: 'no-store',
+        headers: { apikey: SB_CFG.chave, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ p_codigo: p.codigo, p_telefone: p.fone, p_tipo: a.tipo, p_arquivo: b64 })
+      });
+      corpo = await r.json().catch(() => null);
+    } catch (e) { throw new Error('rede'); }
+    if (!r.ok) throw new Error(String((corpo && corpo.message) || 'rede'));
+    const pago = corpo && corpo.situacao === 'pago';
+    marcarPedidoLocal(p.codigo, { situacao: pago ? 'pago' : 'comprovante', enviado: true, comprovanteEm: (corpo && corpo.comprovante_em) || new Date().toISOString() });
+    renderMeusPedidos();
+    if (ui.modo === 'publico' && $('#area-grade')) renderGrade(false);
+    const novo = lerPedidosLocais().find(x => x && x.codigo === p.codigo);
+    if (ui.folha === 'pagamento' && novo) abrirPagamento(novo);
+    toast(pago ? 'Esse pedido já está pago! 💛' : 'Comprovante enviado! 💛');
+  } catch (e) {
+    const m = String((e && e.message) || '');
+    const k = Object.keys(ERROS_COMPROVANTE).find(x => m.indexOf(x) === 0);
+    if (m !== 'vazio') mostra(k ? ERROS_COMPROVANTE[k] : 'Não consegui enviar agora. Tente de novo em instantes.');
+    if (texto) texto.textContent = antes;
+    if (rot) rot.classList.remove('enviando');
+    input.disabled = false;
+  }
+  input.value = '';
+}
+function htmlAnexar(p, rotulo, classe) {
+  return '<label class="' + (classe || 'btn primario largo') + ' anexar"><input type="file" class="arq-oculto" accept="image/*,application/pdf" data-comprovante="' + esc(p.codigo) + '"><span class="anexar-txt">' + (rotulo || '📎 Anexar comprovante') + '</span></label>';
+}
+function ligarAnexos() {
+  $$('#fundo input[data-comprovante]').forEach(inp => inp.addEventListener('change', () => enviarComprovante(inp.dataset.comprovante, inp)));
+}
+
+/* ---------- painel: linha do tempo da venda e comprovantes ---------- */
+function htmlLinhaTempo(v, venc) {
+  const feito = (v.origem === 'site' ? 'Pedido feito em ' : 'Registrado em ') + fmtQuando(v.criadoEm);
+  if (v.pago) return '<p class="dica">' + feito + (v.pagoEm ? ' · pago em ' + fmtQuando(v.pagoEm) : '') + '</p>' +
+    '<p class="dica">' + (v.bilhete ? '✓ Bilhete enviado' : 'Bilhete ainda não enviado') + '</p>';
+  if (v.comprovanteEm) return '<p class="dica">' + feito + ' · comprovante enviado em ' + fmtQuando(v.comprovanteEm) + '</p>' +
+    '<p class="dica">Não vence sozinho: espera você conferir o Pix.</p>';
+  if (v.semPrazo) return '<p class="dica">Reservado em ' + fmtQuando(v.criadoEm) + ' · sem prazo, combinado com você</p>';
+  return '<p class="dica' + (venc ? ' erro' : '') + '">' + (v.origem === 'site' ? 'Pedido feito em ' : 'Reservado em ') + fmtQuando(v.criadoEm) + ' · ' + (venc ? 'o prazo acabou em ' : 'pagar até ') + fmtQuando(prazoDe(v).toISOString()) + '</p>';
+}
+function hexParaBytes(h) {
+  if (typeof h !== 'string') return new Uint8Array(0);
+  const s = h.indexOf('\\x') === 0 ? h.slice(2) : h;
+  const out = new Uint8Array(Math.floor(s.length / 2));
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(s.substr(i * 2, 2), 16);
+  return out;
+}
+const urlsComprovante = [];
+async function abrirComprovantes(id) {
+  const v = vendas.find(x => x.id === id); if (!v) return;
+  const nums = ordenar((v.numeros && v.numeros.length) ? v.numeros : (v.numerosLiberados || []));
+  const total = brl(nums.length * cfg.preco);
+  urlsComprovante.splice(0).forEach(u => URL.revokeObjectURL(u));
+  abrirFolha('comprovante',
+    '<div class="folha-cab">' + cabFolha('Comprovante') +
+      '<p class="dica">' + esc(v.nome || 'Sem nome') + (v.codigo ? ' · pedido ' + esc(v.codigo) : '') + ' · ' + nums.length + (nums.length === 1 ? ' número' : ' números') + ' · <strong class="num">' + total + '</strong></p></div>' +
+    '<div class="folha-corpo">' +
+      '<div class="comp-lista" id="comp-lista" aria-live="polite"><p class="dica">Abrindo o comprovante…</p></div>' +
+      (v.pago ? '<p class="dica">Essa venda já está marcada como paga' + (v.pagoEm ? ' desde ' + fmtQuando(v.pagoEm) : '') + '.</p>'
+        : '<p class="dica">Confira no app do seu banco se entrou um Pix de <strong>' + total + '</strong> com esse nome e esse horário. O comprovante sozinho não garante que o dinheiro entrou.</p>' +
+          '<button class="btn ok largo" type="button" data-acao="comp-pago" data-venda="' + esc(id) + '">O Pix entrou: marcar como pago</button>') +
+    '</div>');
+  try {
+    if (!SB) throw new Error('sem_banco');
+    const { data, error } = await SB.from('comprovantes').select('id,tipo,arquivo,enviado_em').eq('venda_id', id).order('enviado_em', { ascending: false });
+    if (error) throw error;
+    if (ui.folha !== 'comprovante') return;
+    const el = $('#comp-lista'); if (!el) return;
+    if (!data || !data.length) { el.innerHTML = '<p class="dica">Nenhum comprovante foi anexado pela página nesse pedido.</p>'; return; }
+    el.innerHTML = data.map((c, i) => {
+      const url = URL.createObjectURL(new Blob([hexParaBytes(c.arquivo)], { type: c.tipo }));
+      urlsComprovante.push(url);
+      const quando = 'Enviado em ' + fmtQuando(c.enviado_em) + (data.length > 1 && i === 0 ? ' · o mais recente' : '');
+      return '<figure class="comp-item">' + (c.tipo === 'application/pdf'
+        ? '<a class="btn largo" href="' + url + '" target="_blank" rel="noopener" download="Comprovante ' + esc(v.codigo || v.nome || '') + '.pdf">Abrir o PDF do comprovante</a>'
+        : '<a href="' + url + '" target="_blank" rel="noopener" aria-label="Abrir o comprovante em tamanho grande"><img src="' + url + '" alt="Comprovante. ' + esc(quando) + '"></a>') +
+        '<figcaption class="dica">' + esc(quando) + '</figcaption></figure>';
+    }).join('');
+  } catch (e) {
+    const el = $('#comp-lista'); if (el && ui.folha === 'comprovante') el.innerHTML = '<p class="dica erro">Não consegui abrir o comprovante agora. Feche e tente de novo.</p>';
+  }
 }
 
 /* ---------- início ---------- */
