@@ -329,7 +329,7 @@ const RABISCOS = {
   rosa: [['mola', .97, .06, 70, -.3, '--c6', 13], ['onda', -.03, .99, 150, -.12, '--c2', 13]],
   verde: [['laco', .9, .06, 120, .5, '--c5', 14], ['zigue', .02, .99, 70, -.35, '--c3', 11]]
 };
-function desenharRabiscos() {
+function desenharRabiscosPorFaixa() {
   const css = getComputedStyle(document.documentElement);
   $$('canvas.rabiscos').forEach(cv => {
     const lista = RABISCOS[cv.dataset.preset]; if (!lista) return;
@@ -362,7 +362,7 @@ function htmlPremios() {
   return '<div class="carrossel" role="region" aria-roledescription="carrossel" aria-label="Prêmios">' +
     '<div class="trilho" id="trilho" tabindex="0">' + cfg.premios.map((p, i) => {
       const src = MIDIA[imgs[i]] || '';
-      return '<article class="slide" style="background:' + (CORES_PREMIO[i] || CORES_PREMIO[0]) + '" aria-roledescription="slide" aria-label="' + (i + 1) + ' de ' + n + '">' +
+      return '<article class="slide" style="--cor:' + (CORES_PREMIO[i] || CORES_PREMIO[0]) + '" aria-roledescription="slide" aria-label="' + (i + 1) + ' de ' + n + '">' +
         '<div class="slide-topo"><span class="slide-pos">' + (i + 1) + 'º</span><span class="slide-tag">prêmio</span></div>' +
         (src ? '<img src="' + src + '" alt="' + esc(p) + '">' : '') +
         '<h3 class="slide-nome">' + esc(p) + '</h3></article>';
@@ -1830,6 +1830,164 @@ function abrirPausa() {
 async function retomarVendas() {
   await publicar(Object.assign({}, cfg, { pausado: false }), 'Vendas retomadas! A página voltou a aceitar pedidos.');
 }
+
+
+/* =====================================================================
+   Fundo contínuo: rabiscos e rifinhas passando de uma parte pra outra
+   (uma camada só, atrás do texto e na frente das cores das faixas).
+   Cada desenho procura um lugar vazio perto de onde deveria ficar,
+   pra nunca ficar atrás de título, texto, botão ou cartão.
+   ===================================================================== */
+function formaInfo(nome, s) {
+  const pts = [];
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const ponto = (c, x, y) => { pts.push(c + x.toFixed(1) + ' ' + y.toFixed(1)); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
+  FORMAS[nome]({ moveTo: (x, y) => ponto('M', x, y), lineTo: (x, y) => ponto('L', x, y) }, s);
+  return { d: pts.join(''), x0, y0, x1, y1 };
+}
+const RIFINHA = 'M-30 -17h60a5 5 0 0 1 5 5v6a6 6 0 0 0 0 12v6a5 5 0 0 1 -5 5h-60a5 5 0 0 1 -5 -5v-6a6 6 0 0 0 0 -12v-6a5 5 0 0 1 5 -5z';
+function aleatorio(semente) { let s = semente; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; }
+function blocosFundo() {
+  const app = $('#app'); if (!app) return [];
+  const topoApp = app.getBoundingClientRect().top;
+  return $$('.faixa-dona, .hero, main > section, .rodape', app).map(el => {
+    const r = el.getBoundingClientRect();
+    return { top: r.top - topoApp, bottom: r.bottom - topoApp, escuro: el.matches('.hero, .banda-verde, .rodape, .faixa-dona') };
+  });
+}
+/* retângulos de tudo que não pode ficar escondido atrás de um desenho: linhas de texto, botões, cartões, fotos */
+function obstaculosFundo(app) {
+  const topoApp = app.getBoundingClientRect().top, esq = app.getBoundingClientRect().left;
+  const lista = [];
+  const add = r => { if (r.width > 1 && r.height > 1) lista.push({ x0: r.left - esq - 6, y0: r.top - topoApp - 6, x1: r.right - esq + 6, y1: r.bottom - topoApp + 6 }); };
+  const solido = el => {
+    if (/^(IMG|BUTTON|INPUT|TEXTAREA|SELECT|CANVAS|VIDEO|SUMMARY)$/.test(el.tagName) || el.matches('.btn, .slide, .carrossel, .grade, [role="button"]')) return true;
+    if (el.matches('.banda, .hero, .rodape, .wrap, main, section')) return false;
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.position === 'fixed') return null;
+    const bg = cs.backgroundColor;
+    return (bg && bg !== 'transparent' && !/rgba\([^)]*,\s*0\)$/.test(bg)) || cs.backgroundImage !== 'none' || parseFloat(cs.borderTopWidth) > 0;
+  };
+  const andar = el => {
+    for (const filho of el.children) {
+      if (filho.id === 'fundo-desenhos' || filho.matches('canvas.rabiscos')) continue;
+      const s = solido(filho);
+      if (s === null) continue;
+      if (s) { add(filho.getBoundingClientRect()); continue; }
+      andar(filho);
+    }
+    for (const no of el.childNodes) {
+      if (no.nodeType === 3 && no.textContent.trim()) {
+        const rg = document.createRange(); rg.selectNodeContents(no);
+        for (const r of rg.getClientRects()) add(r);
+      }
+    }
+  };
+  andar(app);
+  return lista;
+}
+function caixaGirada(b, tx, ty, ang) {
+  const c = Math.cos(ang), s = Math.sin(ang);
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  [[b.x0, b.y0], [b.x1, b.y0], [b.x0, b.y1], [b.x1, b.y1]].forEach(([x, y]) => {
+    const X = tx + x * c - y * s, Y = ty + x * s + y * c;
+    x0 = Math.min(x0, X); y0 = Math.min(y0, Y); x1 = Math.max(x1, X); y1 = Math.max(y1, Y);
+  });
+  return { x0, y0, x1, y1 };
+}
+function sobreposicao(cx, obs, W) {
+  const a = Math.max(0, cx.x0), b = Math.min(W, cx.x1);
+  if (b <= a) return 0;
+  let soma = 0;
+  for (const o of obs) {
+    const w = Math.min(b, o.x1) - Math.max(a, o.x0); if (w <= 0) continue;
+    const h = Math.min(cx.y1, o.y1) - Math.max(cx.y0, o.y0); if (h <= 0) continue;
+    soma += w * h;
+  }
+  return soma;
+}
+function desenharRabiscos() {
+  const app = $('#app'); if (!app) return;
+  let svg = $('#fundo-desenhos');
+  if (ui.modo !== 'publico' || !$('.hero')) { if (svg) svg.remove(); return; }
+  if (!svg) {
+    svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.id = 'fundo-desenhos'; svg.setAttribute('aria-hidden', 'true');
+  }
+  if (svg.parentNode !== app || app.firstChild !== svg) app.insertBefore(svg, app.firstChild);
+  const blocos = blocosFundo();
+  const W = app.clientWidth, H = blocos.length ? Math.ceil(blocos[blocos.length - 1].bottom) : 0;
+  if (!W || !H) return;
+  fundoAltura = H;
+  svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  const obs = obstaculosFundo(app);
+  const escuroEm = y => { const b = blocos.find(x => y >= x.top && y < x.bottom); return b ? b.escuro : false; };
+  const k = Math.min(1.5, Math.max(1, W / 420));
+  const rnd = aleatorio(20262);
+  let h = '';
+  /* rabiscos nas emendas entre as partes: um lado de cada vez, metade pra fora da tela */
+  const cores = ['--c5', '--c6', '--c2', '--c5', '--c6', '--c2'];
+  const formas = ['laco', 'zigue', 'mola', 'onda', 'laco', 'zigue'];
+  /* onde duas partes escuras se encostam (Me ajuda a vender + rodapé) não há emenda pra enfeitar */
+  const emendas = blocos.slice(0, -1).filter((b, j) => !(b.escuro && blocos[j + 1].escuro)).map(b => b.bottom).filter(y => y > 40 && y < H - 40);
+  emendas.forEach((y, i) => {
+    const direita = i % 2 === 0;
+    const forma = formas[i % formas.length];
+    const tam = (forma === 'onda' ? 130 : forma === 'zigue' ? 80 : forma === 'mola' ? 84 : 100) * k;
+    const f = formaInfo(forma, tam);
+    const ang = (direita ? 1 : -1) * (.12 + rnd() * .25);
+    let melhor = null;
+    [.62, .5, .4, .3].forEach(vis => {
+      [0, -18, 18, -36, 36, -54, 54, -72, 72].forEach(dy => {
+        /* acha a translação que deixa "vis" da largura do desenho dentro da tela */
+        const c0 = caixaGirada(f, 0, 0, ang), larg = c0.x1 - c0.x0;
+        const tx = direita ? W - vis * larg - c0.x0 : vis * larg - c0.x1;
+        const ty = y + dy - (c0.y0 + c0.y1) / 2;
+        const cx = caixaGirada(f, tx, ty, ang);
+        const nota = sobreposicao(cx, obs, W) * 4 + Math.abs(dy) * 6 * k + (.62 - vis) * 1800 * k;
+        if (!melhor || nota < melhor.nota) melhor = { nota, tx, ty };
+      });
+    });
+    h += '<path class="rabisco" style="stroke:var(' + cores[i % cores.length] + ');stroke-width:' + (12 * Math.min(k, 1.3)).toFixed(1) + '" transform="translate(' + melhor.tx.toFixed(0) + ' ' + melhor.ty.toFixed(0) + ') rotate(' + (ang * 57.3).toFixed(0) + ')" d="' + f.d + '"/>';
+  });
+  /* um rabisco no topo, como antes */
+  const topo = formaInfo('mola', 88 * k);
+  h += '<path class="rabisco" style="stroke:var(--c5);stroke-width:' + (14 * Math.min(k, 1.3)).toFixed(1) + '" transform="translate(' + (W * .95).toFixed(0) + ' ' + ((blocos[0] ? blocos[0].top : 0) + 4).toFixed(0) + ') rotate(20)" d="' + topo.d + '"/>';
+  /* rifinhas bem transparentes espalhadas pela página, nos espaços livres */
+  const nRif = Math.max(6, Math.round(H / 340));
+  const passo = H / nRif;
+  for (let i = 0; i < nRif; i++) {
+    const esc = (.75 + rnd() * .5) * Math.min(1.25, k);
+    const rot = (rnd() - .5) * 1.2;
+    const base = { x0: -36 * esc, y0: -18 * esc, x1: 36 * esc, y1: 18 * esc };
+    const lado = i % 2 === 0;
+    let melhor = null;
+    for (let t = 0; t < 14; t++) {
+      const fx = lado ? -.06 + rnd() * .4 : .66 + rnd() * .4;
+      const yy = (i + .15 + rnd() * .7) * passo;
+      const cx = caixaGirada(base, fx * W, yy, rot);
+      const nota = sobreposicao(cx, obs, W) + rnd() * 40;
+      if (!melhor || nota < melhor.nota) melhor = { nota, x: fx * W, y: yy };
+    }
+    const claro = escuroEm(melhor.y);
+    h += '<g class="rifinha' + (claro ? ' clara' : '') + '" transform="translate(' + melhor.x.toFixed(0) + ' ' + melhor.y.toFixed(0) + ') rotate(' + (rot * 57.3).toFixed(0) + ') scale(' + esc.toFixed(2) + ')">' +
+      '<path d="' + RIFINHA + '"/><path class="picote" d="M14 -17v34"/><path class="risco" d="M-22 -4h22M-22 4h14"/></g>';
+  }
+  svg.innerHTML = h;
+  /* o listrado do rodapé continua o do "Me ajuda a vender", sem emenda */
+  const rod = $('.rodape', app), verde = $('.banda-verde', app);
+  if (rod && verde) rod.style.backgroundPosition = '0 ' + (-Math.round(verde.getBoundingClientRect().height)) + 'px';
+}
+let fundoTimer = null, fundoAltura = 0;
+function agendarFundo() {
+  clearTimeout(fundoTimer);
+  fundoTimer = setTimeout(() => {
+    if (ui.modo !== 'publico') return;
+    const b = blocosFundo(); const alt = b.length ? Math.ceil(b[b.length - 1].bottom) : 0;
+    if (Math.abs(alt - fundoAltura) > 2) desenharRabiscos();
+  }, 120);
+}
+if (window.ResizeObserver) { try { new ResizeObserver(agendarFundo).observe($('#app')); } catch (e) { /* segue sem */ } }
 
 /* ---------- início ---------- */
 criarCamadas();

@@ -381,7 +381,7 @@ a.ig{color:inherit;font-weight:700;text-decoration:none}
 .duvidas svg{flex:none}
 
 /* carrossel: cartões com largura fixa, todos podem ficar no centro (também no computador) */
-.trilho{padding:14px calc(50% - min(170px, 40vw)) 30px!important;scroll-padding-inline:0!important}
+.trilho{padding:14px calc(50% - min(170px, 40vw)) 44px!important;scroll-padding-inline:0!important}
 .slide{flex:0 0 auto!important;width:min(340px,80vw)}
 /* carrinho */
 .carrinho{position:relative;flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:var(--c5);color:var(--on-c);border:2px solid var(--b-borda);box-shadow:0 3px 0 var(--b-borda)}
@@ -395,3 +395,44 @@ a.ig{color:inherit;font-weight:700;text-decoration:none}
 /* pausa */
 .aviso-breve.pausa{border-color:var(--accent);background:var(--accent-soft)}
 .aviso-breve.pausa .btn{justify-self:start}
+
+/* ---------- fundo contínuo: as partes se emendam com ondas e os desenhos passam por cima das emendas ---------- */
+:root{--tile-escuro:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Cpath d='M-2 2l4-4M0 15L15 0M13 17l4-4' stroke='rgba(255,255,255,.05)' stroke-width='2.4'/%3E%3C/svg%3E");--tile-claro:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Cpath d='M-2 2l4-4M0 15L15 0M13 17l4-4' stroke='rgba(19,36,31,.055)' stroke-width='2.4'/%3E%3C/svg%3E")}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--tile-escuro:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Cpath d='M-2 2l4-4M0 15L15 0M13 17l4-4' stroke='rgba(255,255,255,.04)' stroke-width='2.4'/%3E%3C/svg%3E");--tile-claro:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Cpath d='M-2 2l4-4M0 15L15 0M13 17l4-4' stroke='rgba(255,255,255,.04)' stroke-width='2.4'/%3E%3C/svg%3E")}}
+:root[data-theme="dark"]{--tile-escuro:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Cpath d='M-2 2l4-4M0 15L15 0M13 17l4-4' stroke='rgba(255,255,255,.04)' stroke-width='2.4'/%3E%3C/svg%3E");--tile-claro:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Cpath d='M-2 2l4-4M0 15L15 0M13 17l4-4' stroke='rgba(255,255,255,.04)' stroke-width='2.4'/%3E%3C/svg%3E")}
+.hero,.banda-verde,.rodape{background-image:var(--tile-escuro)!important}
+.banda-creme,.banda-rosa{background-image:var(--tile-claro)!important}
+#app{position:relative}
+.banda{overflow:visible!important}
+.banda>canvas.rabiscos{display:none!important}
+.banda>.wrap,.rodape>.wrap,main>section:not(.banda)>*{position:relative;z-index:2}
+main>section:not(.banda){position:relative}
+#fundo-desenhos{position:absolute;left:0;top:0;width:100%;z-index:1;pointer-events:none;overflow:hidden}
+#fundo-desenhos .rabisco{fill:none;stroke-linecap:round;stroke-linejoin:round}
+#fundo-desenhos .rifinha{fill:none;stroke:var(--ink);stroke-width:2.2;opacity:.09;stroke-linecap:round}
+#fundo-desenhos .rifinha.clara{stroke:var(--hero-ink);opacity:.11}
+#fundo-desenhos .rifinha .picote{stroke-dasharray:4 4}
+/* cada parte entra na anterior por uma onda da própria cor (sem linha reta) */
+.hero::after,.banda-creme::before,.banda-rosa::before,.banda-rosa::after,.banda-verde::before{content:"";position:absolute;left:0;right:0;top:-33px;height:34px;pointer-events:none;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 40' preserveAspectRatio='none'%3E%3Cpath d='M0 40V22C120 6 240 2 380 12s260 26 420 20 260-26 400-20V40z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 40' preserveAspectRatio='none'%3E%3Cpath d='M0 40V22C120 6 240 2 380 12s260 26 420 20 260-26 400-20V40z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat}
+.hero::after,.banda-rosa::after{background:var(--bg);top:auto;bottom:-1px}
+.banda-creme::before,.banda-rosa::before,.banda-verde::before{background:inherit;background-position:0 33px!important}
+.banda-rosa::before,.banda-rosa::after{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 40' preserveAspectRatio='none'%3E%3Cpath d='M0 40V12c150 18 300 26 470 16s300-24 450-18 220 12 280 16V40z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 40' preserveAspectRatio='none'%3E%3Cpath d='M0 40V12c150 18 300 26 470 16s300-24 450-18 220 12 280 16V40z'/%3E%3C/svg%3E")}
+main>section:not(.banda)+section.banda{margin-top:22px}
+/* fim da página: o verde do "Me ajuda a vender" continua até o rodapé, sem a faixa branca comprida */
+.rodape{background-color:var(--hero);color:var(--hero-muted);position:relative}
+.rodape .wrap{padding-block:18px calc(88px + env(safe-area-inset-bottom,0px))!important;color:var(--hero-muted)!important;border-top:1.5px dashed rgba(255,255,255,.16)}
+.rodape a.btn{--face:var(--btn2);--edge:var(--b-borda)}
+.banda-verde>.wrap.secao{padding-bottom:26px}
+/* ---------- prêmios em cartões de vidro ---------- */
+.carrossel{position:relative;isolation:isolate;-webkit-mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent)}
+.carrossel::before{content:"";position:absolute;inset:4% max(4%,calc(50% - 250px)) 24%;z-index:-1;pointer-events:none;filter:blur(26px);opacity:.6;
+  background:radial-gradient(closest-side at 22% 45%,var(--c5),transparent),radial-gradient(closest-side at 55% 55%,var(--c2),transparent),radial-gradient(closest-side at 82% 40%,var(--c6),transparent)}
+.slide{background:var(--cor);background:color-mix(in srgb,var(--cor) 62%,rgba(255,255,255,.18));-webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5);
+  border:1.5px solid rgba(255,255,255,.75)!important;box-shadow:inset 0 1.5px 0 rgba(255,255,255,.9),0 22px 40px -20px rgba(19,36,31,.45)!important;position:relative;overflow:hidden}
+.slide::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(125deg,rgba(255,255,255,.55),rgba(255,255,255,0) 38%,rgba(255,255,255,0) 70%,rgba(255,255,255,.18))}
+.slide>*{position:relative}
+.slide.ativo{box-shadow:inset 0 1.5px 0 rgba(255,255,255,.95),0 24px 34px -16px rgba(19,36,31,.5)!important}
+.slide img{box-shadow:0 8px 18px -10px rgba(19,36,31,.35)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .slide{background:color-mix(in srgb,var(--cor) 82%,rgba(255,255,255,.05));border-color:rgba(255,255,255,.3)!important}}
+:root[data-theme="dark"] .slide{background:color-mix(in srgb,var(--cor) 82%,rgba(255,255,255,.05));border-color:rgba(255,255,255,.3)!important}
