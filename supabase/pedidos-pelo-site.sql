@@ -4,7 +4,7 @@
 -- O comprador escolhe os números, informa nome e WhatsApp e toca em
 -- "Gerar Pix e reservar": a função reservar() separa os números na hora,
 -- com o mesmo prazo de reserva do painel, e devolve o código do pedido.
--- Proteções: até 20 números por pedido, no máximo 2 pedidos sem pagamento
+-- Proteções: até 40 números por pedido, no máximo 2 pedidos sem pagamento
 -- por WhatsApp, 4 por conexão e 30 pedidos do site por hora no total.
 -- Rode depois de configurar.sql e liberar-reservas.sql.
 -- Pode rodar de novo sem medo: nada é apagado.
@@ -108,7 +108,7 @@ begin
   if cardinality(v_nums) = 0 then
     raise exception 'sem_numeros';
   end if;
-  if cardinality(v_nums) > 20 then
+  if cardinality(v_nums) > 40 then
     raise exception 'muitos_numeros';
   end if;
   if not (v_nums <@ public.numeros_da_rifa()) then

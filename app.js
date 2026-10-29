@@ -1484,7 +1484,7 @@ function aplicarEstado(e) {
 /* =====================================================================
    Pedido em duas etapas: dados → Pix reservado → comprovante no WhatsApp
    ===================================================================== */
-const MAX_POR_PEDIDO = 20;
+const MAX_POR_PEDIDO = 40;
 const PEDIDO_ANTIGO = 'Oi, {vendedora}! Vim pela página da rifa e quero participar 🎉\nNome: {nome}\nNúmeros: {numeros}\nTotal: {total}\nJá te mando o comprovante do Pix aqui.';
 
 /* pedidos deste aparelho (só pra mostrar de novo o Pix e o botão do comprovante) */

@@ -122,7 +122,7 @@ begin
   if cardinality(v_nums) = 0 then
     raise exception 'sem_numeros';
   end if;
-  if cardinality(v_nums) > 20 then
+  if cardinality(v_nums) > 40 then
     raise exception 'muitos_numeros';
   end if;
   if not (v_nums <@ public.numeros_da_rifa()) then
