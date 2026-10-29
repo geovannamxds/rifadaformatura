@@ -2093,7 +2093,7 @@ async function obterChaveBilhetes() {
 async function fotoBilhete(n) {
   if (fotosBilhete.has(n)) return fotosBilhete.get(n);
   const chave = await obterChaveBilhetes();
-  const r = await fetch(RAIZ + 'bilhetes/' + n + '.bin');
+  const r = await fetch(RAIZ + 'bilhetes/' + n + '.bin?v=hd');
   if (r.status === 404) return null;
   if (!r.ok) throw new Error('rede');
   const b = new Uint8Array(await r.arrayBuffer());
