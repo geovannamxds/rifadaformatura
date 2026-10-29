@@ -16,8 +16,9 @@ async function rpc(nome: string, corpo: unknown) {
     headers: { apikey: k, Authorization: 'Bearer ' + k, 'Content-Type': 'application/json' },
     body: JSON.stringify(corpo ?? {})
   });
-  if (!r.ok) throw new Error(nome + ' ' + r.status + ' ' + (await r.text()).slice(0, 200));
-  return r.json();
+  const txt = await r.text();
+  if (!r.ok) throw new Error(nome + ' ' + r.status + ' ' + txt.slice(0, 200));
+  return txt ? JSON.parse(txt) : null;
 }
 
 Deno.serve(async () => {
