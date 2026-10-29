@@ -457,7 +457,7 @@ function renderPublico() {
       '<div class="legenda" id="legenda-pub">' + htmlLegendaPub() + '</div>';
   }
   const linhaLivres = aberta
-    ? '<p class="dica" id="linha-livres">' + (cfg.mostrarContador ? livres + ' de ' + total + ' números ainda livres. ' : 'Os números riscados já têm dono. ') + (atualizadoPub ? 'Atualizado em ' + fmtQuando(atualizadoPub) + '.' : '') + '</p>'
+    ? '<p class="dica" id="linha-livres">' + (cfg.mostrarContador ? livres + ' de ' + total + ' números ainda livres. ' : 'Os números riscados já têm dono. ') + (atualizadoPub ? textoAtualizado(atualizadoPub) : '') + '</p>'
     : '';
   const dias = diasParaFim();
   const pilulaVendas = pausado ? '<span class="pilula coral">⏸️ Vendas pausadas no momento</span>' : (aberta && dias > 0 && dias <= 30)
@@ -1290,8 +1290,11 @@ async function buscarEstadoExterno() {
   } catch (err) { /* segue com o estado embutido */ }
 }
 if (TEM_SB && PAGINA !== 'admin') {
-  setInterval(() => { if (!document.hidden) buscarEstadoSB(); }, 45000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) buscarEstadoSB(); });
+  setInterval(() => conferirAgora(10000), 15000);
+  document.addEventListener('visibilitychange', () => conferirAgora());
+  window.addEventListener('focus', () => conferirAgora());
+  window.addEventListener('pageshow', ev => { if (ev.persisted) conferirAgora(0); });
+  window.addEventListener('online', () => conferirAgora(0));
 }
 
 /* =====================================================================
@@ -1506,13 +1509,27 @@ async function buscarEstadoSB() {
     if (!r.ok) return false;
     const e = await r.json();
     if (!e || !e.cfg) return false;
-    aplicarEstado(e);
+    ultimaBuscaOk = Date.now();
+    aplicarEstado(Object.assign({}, e, { atualizado: new Date().toISOString() }));
     return true;
   } catch (err) { return false; }
 }
+/* confere o banco de novo sem repetir à toa (vários eventos chegam juntos quando a pessoa volta pra página) */
+let ultimaBuscaOk = 0, buscandoEstado = null;
+function conferirAgora(minimo = 3000) {
+  if (!TEM_SB || PAGINA === 'admin' || document.hidden) return;
+  if (buscandoEstado || Date.now() - ultimaBuscaOk < minimo) return;
+  buscandoEstado = buscarEstadoSB().finally(() => { buscandoEstado = null; });
+}
+function textoAtualizado(iso) {
+  const d = new Date(iso); if (isNaN(d)) return '';
+  const dia = x => x.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+  return dia(d) === dia(new Date()) ? 'Atualizado às ' + hora + '.' : 'Atualizado em ' + fmtQuando(iso) + '.';
+}
 function textoLivres() {
   const livres = UNI.filter(n => !ocupadosPub.has(n)).length;
-  return (cfg.mostrarContador ? livres + ' de ' + UNI.length + ' números ainda livres. ' : 'Os números riscados já têm dono. ') + (atualizadoPub ? 'Atualizado em ' + fmtQuando(atualizadoPub) + '.' : '');
+  return (cfg.mostrarContador ? livres + ' de ' + UNI.length + ' números ainda livres. ' : 'Os números riscados já têm dono. ') + (atualizadoPub ? textoAtualizado(atualizadoPub) : '');
 }
 function aplicarEstado(e) {
   /* o banco já tem comprovante pelo site e situação do pedido? (estado_publico novo manda 'reservados') */
@@ -1525,6 +1542,7 @@ function aplicarEstado(e) {
     novosRes.size !== reservadosPub.size || Array.from(novosRes).some(n => !reservadosPub.has(n));
   const linha = $('#linha-livres');
   if (!mudouCfg && !mudouOcup) { if (e.atualizado) atualizadoPub = e.atualizado; if (linha) linha.textContent = textoLivres(); return; }
+  if (mudouOcup && PAGINA !== 'admin' && lerPedidosLocais().length) setTimeout(sincronizarMeusPedidos, 50);
   const sobraLivre = lerFaixas(cfgNovo.faixas).nums.some(n => !novos.has(n));
   const telaToda = mudouCfg || !sobraLivre || !$('#area-grade');
   if (telaToda && ui.folha && ui.modo === 'publico') return; /* não mexe na tela com uma janela aberta; tenta na próxima */
@@ -2316,7 +2334,9 @@ function temPedidoEsperando() { return lerPedidosLocais().some(p => pedidoVisive
 if (TEM_SB && PAGINA === 'publico') {
   setTimeout(sincronizarMeusPedidos, 1200);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - ultimaSinc > 15000) sincronizarMeusPedidos(); });
-  setInterval(() => { if (document.visibilityState === 'visible' && temPedidoEsperando()) sincronizarMeusPedidos(); }, 45000);
+  setInterval(() => { if (document.visibilityState === 'visible' && temPedidoEsperando()) sincronizarMeusPedidos(); }, 20000);
+  window.addEventListener('pageshow', ev => { if (ev.persisted) sincronizarMeusPedidos(); });
+  window.addEventListener('online', () => sincronizarMeusPedidos());
 }
 
 /* ---------- comprovante: foto vira JPEG leve; PDF vai como está ---------- */
