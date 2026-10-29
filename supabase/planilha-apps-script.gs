@@ -48,6 +48,7 @@ function atualizarPlanilha(d) {
   const vendas = d.vendas || [];
 
   const situacao = function (v) {
+    if (v.situacao) return v.situacao;
     if (v.pago) return 'Pago';
     if (!(v.numeros || []).length && v.liberada) return 'Liberada (não pagou no prazo)';
     if (Date.parse(v.criado) + prazoHoras * 3600000 < Date.now()) return 'Reserva vencida';
@@ -60,7 +61,7 @@ function atualizarPlanilha(d) {
     return [
       v.codigo || '', v.nome || '', fone(v.telefone), nums.join(', '), nums.length, nums.length * preco,
       situacao(v), v.bilhete ? 'Sim' : 'Não', quando(v.criado), quando(v.pago_em),
-      v.origem === 'site' ? 'Site' : 'Painel', v.obs || ''
+      v.origem_txt || (v.origem === 'site' ? 'Site' : 'Painel'), v.obs || ''
     ];
   });
   escrever(ss, 'Vendas',

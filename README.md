@@ -15,6 +15,7 @@ Página de vendas dos números da Rifa Formô 26.2, com painel de controle prote
 - `supabase/configurar.sql`: cria as tabelas e as regras de segurança no Supabase (rode primeiro).
 - `supabase/liberar-reservas.sql`: libera sozinho, a cada 10 minutos, as reservas que passaram do prazo sem pagamento (rode depois). A venda não é apagada: os números ficam guardados pra devolver se a pessoa pagar atrasado.
 - `supabase/pedidos-pelo-site.sql`: o comprador faz o pedido na página (nome, WhatsApp, números) e os números ficam reservados na hora, com limites contra reservas de brincadeira.
+- `supabase/presencial-e-pausa.sql`: venda presencial "sem prazo" (não é liberada sozinha) e pausa das vendas pelo painel.
 - `supabase/copia-na-planilha.sql` e `supabase/planilha-apps-script.gs`: cópia automática das vendas numa planilha do Google da Geo (o endereço e a senha da planilha ficam só no banco, na tabela `integracoes`).
 - `painel.webmanifest` e `img/icone-*.png`: o painel pode ser instalado como aplicativo no celular.
 - `estado.json`: cópia de reserva da configuração, usada se o banco de dados não responder.

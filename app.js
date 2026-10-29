@@ -87,7 +87,7 @@ function linkWa(fone, texto) { return 'https://wa.me/' + foneWa(fone) + '?text='
 function diaSemana(iso) { try { return new Date(iso + 'T12:00:00-03:00').toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' }); } catch (e) { return ''; } }
 function prazoDe(v) { const t = Date.parse(v.criadoEm || ''); return new Date((isNaN(t) ? Date.now() : t) + (Number(cfg.prazoReserva) || 24) * 3600000); }
 function liberada(v) { return !!v.liberadaEm && !(v.numeros || []).length; }
-function vencida(v) { return !v.pago && !liberada(v) && Date.now() > prazoDe(v).getTime(); }
+function vencida(v) { return !v.pago && !v.semPrazo && !liberada(v) && Date.now() > prazoDe(v).getTime(); }
 function vendasEncerradas() { return Date.now() > new Date(cfg.fimVendas + 'T23:59:59-03:00').getTime(); }
 
 /* faixas de números → universo e blocos de 50 */
@@ -376,10 +376,11 @@ function ligarCarrossel() {
   const tr = $('#trilho'); if (!tr) return;
   const slides = $$('.slide', tr), pontos = $$('.ponto');
   const reduz = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let atual = 0, pausadoAte = 0, raf = null;
+  let atual = 0, pausadoAte = 0, raf = null, travaAte = 0;
   const marcar = () => { pontos.forEach((p, k) => p.setAttribute('aria-current', String(k === atual))); slides.forEach((s, k) => s.classList.toggle('ativo', k === atual)); };
   irPremio = (i, suave) => {
     atual = (i + slides.length) % slides.length;
+    travaAte = Date.now() + 1100;
     const s = slides[atual];
     tr.scrollTo({ left: s.offsetLeft - (tr.clientWidth - s.offsetWidth) / 2, behavior: suave && !reduz ? 'smooth' : 'auto' });
     marcar();
@@ -389,6 +390,7 @@ function ligarCarrossel() {
   tr.addEventListener('scroll', () => {
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(() => {
+      if (Date.now() < travaAte) return;
       const c = tr.scrollLeft + tr.clientWidth / 2; let best = 0, d = Infinity;
       slides.forEach((s, k) => { const dd = Math.abs(s.offsetLeft + s.offsetWidth / 2 - c); if (dd < d) { d = dd; best = k; } });
       if (best !== atual) { atual = best; marcar(); }
@@ -421,13 +423,16 @@ function renderPublico() {
   const livres = UNI.filter(n => !ocupadosPub.has(n)).length;
   const encerrado = vendasEncerradas();
   const esgotado = cfg.pronto && !encerrado && total > 0 && livres === 0;
-  const aberta = cfg.pronto && !encerrado && !esgotado;
+  const pausado = cfg.pronto && !encerrado && !!cfg.pausado;
+  const aberta = cfg.pronto && !encerrado && !esgotado && !pausado;
   const V = esc(cfg.vendedora);
   let escolha;
   if (!cfg.pronto) {
     escolha = '<div class="aviso-breve"><h3>Os números abrem em breve</h3><p class="dica">Estou terminando de preparar esta página. Volta daqui a pouquinho!</p></div>';
   } else if (encerrado) {
     escolha = '<div class="aviso-breve"><h3>As vendas terminaram</h3><p class="dica">A venda dos números foi até ' + dataBR(cfg.fimVendas) + '. O sorteio é dia ' + dataBR(cfg.sorteio) + ', ao vivo no ' + igLink() + '. Boa sorte pra quem comprou!</p></div>';
+  } else if (pausado) {
+    escolha = htmlPausada();
   } else if (esgotado) {
     escolha = '<div class="esgotou"><span class="esgotou-selo">Esgotou! 🎉</span><h3>Todos os números já têm dono</h3><p>Muito obrigada a todo mundo que comprou e me ajudou! Vou ter mais rifas da formatura por aí. Quer que eu te avise quando abrir a próxima?</p>' +
       (cfg.whatsapp ? '<a class="btn primario" href="' + esc(linkWa(cfg.whatsapp, 'Oi, ' + cfg.vendedora + '! Vi que a rifa esgotou. Me avisa quando abrir a próxima? 😊')) + '" target="_blank" rel="noopener">Me avisa da próxima rifa</a>' : '') + '</div>';
@@ -442,7 +447,7 @@ function renderPublico() {
     ? '<p class="dica" id="linha-livres">' + (cfg.mostrarContador ? livres + ' de ' + total + ' números ainda livres. ' : 'Os números riscados já têm dono. ') + (atualizadoPub ? 'Atualizado em ' + fmtQuando(atualizadoPub) + '.' : '') + '</p>'
     : '';
   const dias = diasParaFim();
-  const pilulaVendas = (aberta && dias > 0 && dias <= 30)
+  const pilulaVendas = pausado ? '<span class="pilula coral">⏸️ Vendas pausadas no momento</span>' : (aberta && dias > 0 && dias <= 30)
     ? '<span class="pilula coral">🚨 Faltam ' + dias + ' ' + plural(dias, 'dia', 'dias') + ' pro fim das vendas</span>'
     : '<span class="pilula contorno">Vendas até ' + dataBR(cfg.fimVendas) + '</span>';
   const P = esc(prazoTexto());
@@ -563,9 +568,9 @@ function renderBarra() {
   const mostrar = n > 0 && !ui.folha && (ui.modo === 'publico' || ui.aba === 'numeros');
   if (!mostrar) { el.hidden = true; return; }
   el.hidden = false;
-  el.innerHTML = '<div class="barra-in"><div class="barra-info"><span>' + n + ' ' + plural(n, 'número', 'números') + '</span><span class="num">' + brl(n * cfg.preco) + '</span></div>' +
+  el.innerHTML = '<div class="barra-in">' + (ui.modo === 'admin' ? '' : htmlCarrinho(n)) + '<div class="barra-info"><span>' + n + ' ' + plural(n, 'número', 'números') + '</span><span class="num">' + brl(n * cfg.preco) + '</span></div>' +
     '<div class="barra-acoes"><button class="btn peq fantasma" type="button" data-acao="limpar-sel">Limpar</button>' +
-    '<button class="btn primario" type="button" data-acao="continuar">' + (ui.modo === 'admin' ? 'Registrar venda' : 'Continuar') + '</button></div></div>';
+    '<button class="btn primario" type="button" data-acao="continuar">' + (ui.modo === 'admin' ? 'Registrar venda' : 'Fechar pedido') + '</button></div></div>';
 }
 
 /* ---------- folhas (modais) ---------- */
@@ -643,7 +648,7 @@ function renderAdmin() {
   $('#app').innerHTML =
     '<div class="wrap adm">' +
       '<header class="adm-cab"><div><p class="rot">Painel da vendedora · só você vê</p><h1>' + esc(cfg.titulo) + '</h1></div>' +
-      '<div class="adm-acoes"><button class="btn peq" type="button" data-acao="ver-pub">Ver como comprador</button><button class="btn peq" type="button" data-acao="compartilhar">Divulgar</button>' + (SB ? '<button class="btn peq fantasma" type="button" data-acao="sair">Sair</button>' : '') + '</div></header>' +
+      '<div class="adm-acoes"><button class="btn peq" type="button" data-acao="ver-pub">Ver como comprador</button><button class="btn peq" type="button" data-acao="compartilhar">Divulgar</button>' + (cfg.pausado ? '<button class="btn peq ok" type="button" data-acao="retomar">▶ Retomar vendas</button>' : '<button class="btn peq" type="button" data-acao="pausar">⏸ Pausar vendas</button>') + (SB ? '<button class="btn peq fantasma" type="button" data-acao="sair">Sair</button>' : '') + '</div></header>' +
       '<div id="avisos"></div>' +
       '<section id="resumo" class="resumo" aria-label="Resumo das vendas"></section>' +
       '<details class="prazos"><summary>Prazos da Formô</summary><ul>' +
@@ -662,6 +667,7 @@ function renderAdmin() {
 function renderAvisos() {
   const el = $('#avisos'); if (!el) return;
   let h = htmlAvisoGanhadores();
+  if (cfg.pausado) h += '<div class="aviso alerta"><div><strong>⏸️ As vendas estão pausadas.</strong><p>Quem abre a página vê os prêmios e o seu aviso, mas não consegue reservar números.</p></div><button class="btn peq ok" type="button" data-acao="retomar">Retomar vendas</button></div>';
   if (!cfg.pronto) h += '<div class="aviso alerta"><div><strong>Falta pouco pra abrir as vendas.</strong><p>Preencha seu WhatsApp e o Pix em Ajustes, confira seus números e salve. Até lá, quem abre o link vê os prêmios e um aviso de “em breve”.</p></div></div>';
   if (erroVendas) h += '<div class="aviso alerta"><p>' + esc(erroVendas) + '</p></div>';
   const nVenc = vendasCarregadas ? vendas.filter(vencida).length : 0;
@@ -701,7 +707,7 @@ function renderAba() {
   const el = $('#aba-corpo'); if (!el) return;
   if (ui.aba === 'vendas') {
     el.innerHTML =
-      '<div class="lista-topo"><button class="btn primario" type="button" data-acao="nova-venda">Nova venda</button>' +
+      '<div class="lista-topo"><button class="btn primario" type="button" data-acao="nova-venda">+ Venda presencial</button>' +
       '<div class="busca-v"><label for="busca-venda" class="sr">Buscar venda</label><input id="busca-venda" type="search" placeholder="Buscar por nome ou número" value="' + esc(ui.busca) + '"></div></div>' +
       '<div class="filtros" id="filtros"></div><div id="lista" class="lista"></div>' +
       '<div class="export"><div class="linha-botoes"><button class="btn peq" type="button" data-acao="imprimir-lista">Imprimir lista de controle</button><button class="btn peq" type="button" data-acao="csv">Baixar planilha (.csv)</button></div><p class="dica">A lista de controle sai no modelo da Formô, uma página por bloco, pronta pra imprimir ou salvar em PDF. A planilha abre no Excel e no Google Planilhas.</p></div>';
@@ -742,7 +748,7 @@ function cardLiberada(v) {
   const nums = ordenar(v.numerosLiberados || []);
   return '<article class="venda liberada">' +
     '<div class="venda-topo"><span class="pill liberada">Reserva liberada</span><span class="num">' + brl(nums.length * cfg.preco) + '</span></div>' +
-    '<div><h3 class="venda-nome">' + esc(v.nome || 'Sem nome') + '</h3>' + (v.telefone ? '<span class="dica">' + esc(foneBonito(v.telefone)) + '</span>' : '') + (v.codigo ? '<span class="dica cod-pedido">Pedido ' + esc(v.codigo) + (v.origem === 'site' ? ' · feito pelo site' : '') + '</span>' : '') + '</div>' +
+    '<div><h3 class="venda-nome">' + esc(v.nome || 'Sem nome') + '</h3>' + (v.telefone ? '<span class="dica">' + esc(foneBonito(v.telefone)) + '</span>' : '') + (v.codigo ? '<span class="dica cod-pedido">Pedido ' + esc(v.codigo) + (v.origem === 'site' ? ' · feito pelo site' : '') + '</span>' : (v.origem === 'presencial' ? '<span class="dica cod-pedido">Venda presencial</span>' : '')) + '</div>' +
     '<div class="chips">' + nums.map(n => '<span class="chip-num riscado">' + n + '</span>').join('') + '</div>' +
     '<p class="dica">Reservou em ' + fmtQuando(v.criadoEm) + ' · liberada em ' + fmtQuando(v.liberadaEm) + ', porque o pagamento não chegou no prazo.</p>' +
     (v.obs ? '<p class="dica">' + esc(v.obs) + '</p>' : '') +
@@ -780,9 +786,9 @@ function cardVenda(v) {
   acoes += '<button class="btn peq fantasma" type="button" data-acao="editar-venda" data-venda="' + esc(v.id) + '">Editar</button>';
   return '<article class="venda">' +
     '<div class="venda-topo"><span class="pill ' + (v.pago ? 'pago' : (venc ? 'vencida' : (venceLogo(v) ? 'vencendo' : 'aguardando'))) + '">' + (v.pago ? 'Pago' : (venc ? 'Reserva vencida' : (venceLogo(v) ? '⏰ Vence em ' + faltaTexto(v) : 'Aguardando pagamento'))) + '</span><span class="num">' + brl(nums.length * cfg.preco) + '</span></div>' +
-    '<div><h3 class="venda-nome">' + esc(v.nome || 'Sem nome') + '</h3>' + (v.telefone ? '<span class="dica">' + esc(foneBonito(v.telefone)) + '</span>' : '') + (v.codigo ? '<span class="dica cod-pedido">Pedido ' + esc(v.codigo) + (v.origem === 'site' ? ' · feito pelo site' : '') + '</span>' : '') + '</div>' +
+    '<div><h3 class="venda-nome">' + esc(v.nome || 'Sem nome') + '</h3>' + (v.telefone ? '<span class="dica">' + esc(foneBonito(v.telefone)) + '</span>' : '') + (v.codigo ? '<span class="dica cod-pedido">Pedido ' + esc(v.codigo) + (v.origem === 'site' ? ' · feito pelo site' : '') + '</span>' : (v.origem === 'presencial' ? '<span class="dica cod-pedido">Venda presencial</span>' : '')) + '</div>' +
     '<div class="chips">' + nums.map(n => '<span class="chip-num">' + n + '</span>').join('') + '</div>' +
-    (v.pago ? '<p class="dica">' + (v.bilhete ? 'Bilhete enviado' : 'Bilhete ainda não enviado') + '</p>' : '<p class="dica' + (venc ? ' erro' : '') + '">Reservado em ' + fmtQuando(v.criadoEm) + ' · ' + (venc ? 'o prazo acabou em ' : 'pagar até ') + fmtQuando(prazoDe(v).toISOString()) + '</p>') +
+    (v.pago ? '<p class="dica">' + (v.bilhete ? 'Bilhete enviado' : 'Bilhete ainda não enviado') + '</p>' : (v.semPrazo ? '<p class="dica">Reservado em ' + fmtQuando(v.criadoEm) + ' · sem prazo, combinado com você</p>' : '<p class="dica' + (venc ? ' erro' : '') + '">Reservado em ' + fmtQuando(v.criadoEm) + ' · ' + (venc ? 'o prazo acabou em ' : 'pagar até ') + fmtQuando(prazoDe(v).toISOString()) + '</p>')) +
     (v.obs ? '<p class="dica">' + esc(v.obs) + '</p>' : '') +
     '<div class="venda-acoes">' + acoes + '</div></article>';
 }
@@ -815,13 +821,14 @@ function abrirVenda(v, numsIniciais) {
   ui.vendaEdit = v ? v.id : null; ui.confirmarExclusao = false;
   const nums = v ? ordenar(v.numeros || []) : ordenar(numsIniciais || []);
   abrirFolha('venda',
-    '<div class="folha-cab">' + cabFolha(v ? 'Editar venda' : 'Nova venda') + '</div>' +
+    '<div class="folha-cab">' + cabFolha(v ? 'Editar venda' : 'Venda presencial') + '</div>' +
     '<form id="f-venda" class="folha-corpo" novalidate>' +
-      (v ? '' : '<details class="colar"' + (nums.length ? '' : ' open') + '><summary>Colar pedido do WhatsApp</summary><div class="campo"><label for="v-colar">Cole a mensagem que o comprador mandou</label><textarea id="v-colar" placeholder="Oi, ' + esc(cfg.vendedora) + '! Quero comprar a rifa…"></textarea><p class="dica">O nome e os números são preenchidos sozinhos.</p></div></details>') +
+      (v ? '' : '<details class="colar"><summary>Colar pedido do WhatsApp</summary><div class="campo"><label for="v-colar">Cole a mensagem que o comprador mandou</label><textarea id="v-colar" placeholder="Oi, ' + esc(cfg.vendedora) + '! Quero comprar a rifa…"></textarea><p class="dica">O nome e os números são preenchidos sozinhos.</p></div></details>') +
       '<div class="campo"><label for="v-numeros">Números</label><input id="v-numeros" type="text" inputmode="numeric" autocomplete="off" placeholder="Ex.: 19203, 19245" value="' + nums.join(', ') + '"><div id="v-numeros-info" class="dica"></div></div>' +
       '<div class="campo"><label for="v-nome">Nome do comprador</label><input id="v-nome" type="text" autocomplete="off" value="' + esc(v ? v.nome : '') + '"></div>' +
       '<div class="campo"><label for="v-tel">WhatsApp do comprador</label><input id="v-tel" type="tel" inputmode="tel" autocomplete="off" placeholder="(DDD) 99999-0000" value="' + esc(v && v.telefone ? foneBonito(v.telefone) : '') + '"><p class="dica">Opcional. Com ele, cobrar e mandar o bilhete já abrem a conversa certa.</p></div>' +
-      '<label class="opcao" for="v-pago"><input id="v-pago" type="checkbox"' + (v && v.pago ? ' checked' : '') + '><span>Pagamento recebido</span></label>' +
+      '<label class="opcao" for="v-pago"><input id="v-pago" type="checkbox"' + ((v ? v.pago : true) ? ' checked' : '') + '><span>Pagamento recebido</span></label>' +
+      '<label class="opcao" for="v-semprazo" id="v-semprazo-l"' + ((v ? v.pago : true) ? ' hidden' : '') + '><input id="v-semprazo" type="checkbox"' + ((v ? v.semPrazo : true) ? ' checked' : '') + '><span>Segurar os números sem prazo (a pessoa vai pagar depois)</span></label>' +
       '<label class="opcao" for="v-bilhete"><input id="v-bilhete" type="checkbox"' + (v && v.bilhete ? ' checked' : '') + '><span>Bilhete enviado</span></label>' +
       '<div class="campo"><label for="v-obs">Observação</label><input id="v-obs" type="text" autocomplete="off" placeholder="Ex.: paga sexta, em dinheiro" value="' + esc(v ? v.obs : '') + '"></div>' +
       '<p class="erro" id="v-erro" hidden></p>' +
@@ -829,6 +836,7 @@ function abrirVenda(v, numsIniciais) {
       (v ? '<div class="zona-excluir" id="zona-excluir"></div>' : '') +
     '</form>');
   const inNum = $('#v-numeros');
+  $('#v-pago').addEventListener('change', () => { $('#v-semprazo-l').hidden = $('#v-pago').checked; });
   const atualizarInfo = () => {
     const ns = lerNumeros(inNum.value, false);
     const a = analisarNumeros(ns, ui.vendaEdit);
@@ -879,7 +887,7 @@ async function salvarVenda() {
   const pago = $('#v-pago').checked;
   const doc = {
     nome, numeros: nums, telefone: soDigitos($('#v-tel').value), pago, bilhete: $('#v-bilhete').checked,
-    obs: $('#v-obs').value.trim(), criadoEm: antiga && !(liberada(antiga) && !pago) ? (antiga.criadoEm || agora) : agora, atualizadoEm: agora,
+    obs: $('#v-obs').value.trim(), semPrazo: !pago && $('#v-semprazo').checked, origem: antiga ? (antiga.origem || 'painel') : 'presencial', criadoEm: antiga && !(liberada(antiga) && !pago) ? (antiga.criadoEm || agora) : agora, atualizadoEm: agora,
     pagoEm: pago ? ((antiga && antiga.pagoEm) || agora) : null
   };
   salvando = true; $('#v-salvar').disabled = true;
@@ -1105,6 +1113,8 @@ document.addEventListener('click', e => {
       if (!vendasCarregadas) { toast('Espere suas vendas carregarem.'); break; }
       publicar(null, 'Página dos compradores atualizada'); break;
     case 'csv': baixarCSV(); break;
+    case 'pausar': abrirPausa(); break;
+    case 'retomar': retomarVendas(); break;
     case 'imprimir-lista': imprimirLista(); break;
     case 'ver-pedido': verPedido(t.dataset.codigo); break;
     case 'mandou-comprovante': marcarPedidoLocal(t.dataset.codigo, { enviado: true }); renderMeusPedidos(); break;
@@ -1145,7 +1155,7 @@ function tocarNumero(n) {
     const meu = TEM_SB ? pedidoDoNumero(n) : null;
     if (meu) { toast('O ' + n + ' está reservado pra você (pedido ' + meu.codigo + ').'); return; }
     if (ocupadosPub.has(n)) { toast('O ' + n + ' já tem dono. Escolha outro.'); return; }
-    if (!cfg.pronto || vendasEncerradas()) return;
+    if (!cfg.pronto || vendasEncerradas() || cfg.pausado) return;
     if (TEM_SB && !ui.sel.has(n) && ui.sel.size >= MAX_POR_PEDIDO) { toast('Cada pedido vai até ' + MAX_POR_PEDIDO + ' números. Finalize este e faça outro depois.'); return; }
   }
   if (ui.sel.has(n)) ui.sel.delete(n); else ui.sel.add(n);
@@ -1223,7 +1233,7 @@ if (TEM_SB && PAGINA !== 'admin') {
    Versão do site (GitHub Pages) com banco de dados no Supabase
    ===================================================================== */
 const SB_TABELA = 'vendas';
-const CAMPOS_VENDA = { nome: 'nome', telefone: 'telefone', numeros: 'numeros', pago: 'pago', bilhete: 'bilhete', obs: 'obs', criadoEm: 'criado_em', atualizadoEm: 'atualizado_em', pagoEm: 'pago_em', liberadaEm: 'liberada_em', numerosLiberados: 'numeros_liberados', codigo: 'codigo', origem: 'origem' };
+const CAMPOS_VENDA = { nome: 'nome', telefone: 'telefone', numeros: 'numeros', pago: 'pago', bilhete: 'bilhete', obs: 'obs', criadoEm: 'criado_em', atualizadoEm: 'atualizado_em', pagoEm: 'pago_em', liberadaEm: 'liberada_em', numerosLiberados: 'numeros_liberados', codigo: 'codigo', origem: 'origem', semPrazo: 'sem_prazo' };
 function paraLinha(d) {
   const r = {};
   Object.keys(CAMPOS_VENDA).forEach(k => { if (k in d) r[CAMPOS_VENDA[k]] = d[k]; });
@@ -1236,6 +1246,7 @@ function daLinha(r) {
   Object.keys(CAMPOS_VENDA).forEach(k => { d[k] = r[CAMPOS_VENDA[k]]; });
   d.numeros = (d.numeros || []).map(Number); d.obs = d.obs || ''; d.telefone = d.telefone || '';
   d.numerosLiberados = (d.numerosLiberados || []).map(Number); d.liberadaEm = d.liberadaEm || null;
+  d.semPrazo = !!d.semPrazo;
   return d;
 }
 function falhaSB(error) {
@@ -1523,7 +1534,7 @@ function abrirCheckout(erroMsg, comAlternativa) {
   const nums = ordenar(ui.sel);
   if (!nums.length) { fecharFolha(); return; }
   abrirFolha('pedido',
-    '<div class="folha-cab">' + cabFolha('Seu pedido') + htmlChipsPedido(nums, true) + '</div><div class="perfura" aria-hidden="true"></div>' +
+    '<div class="folha-cab">' + cabFolha('<span class="tit-carrinho">' + ICONE_CARRINHO + '</span>Seu pedido') + htmlChipsPedido(nums, true) + '</div><div class="perfura" aria-hidden="true"></div>' +
     '<form class="folha-corpo" id="f-checkout" novalidate>' + htmlEtapas(1) +
       '<div class="campo"><label for="p-nome">Seu nome</label><input id="p-nome" type="text" autocomplete="name" placeholder="Nome e sobrenome" value="' + esc(ui.nomeComprador || '') + '"></div>' +
       '<div class="campo"><label for="p-fone">Seu WhatsApp, com DDD</label><input id="p-fone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(41) 99999-0000" value="' + esc(ui.foneComprador || '') + '"><p class="dica">É por ele que eu confirmo o pagamento e te mando o bilhete.</p></div>' +
@@ -1588,6 +1599,7 @@ function tratarErroReserva(msg) {
     muitos_numeros: 'Cada pedido vai até ' + MAX_POR_PEDIDO + ' números. Tire alguns e faça outro pedido depois.',
     numero_fora: 'Algum desses números não está mais à venda. Recarregue a página e escolha de novo.',
     vendas_fechadas: 'As vendas estão fechadas no momento.',
+    vendas_pausadas: 'As vendas estão pausadas por um instante. Tente de novo daqui a pouco!',
     nome_invalido: 'Escreva seu nome pra eu saber de quem é o pedido.',
     telefone_invalido: 'Confira seu WhatsApp: coloque o DDD e o número, como (41) 99999-0000.',
     sem_numeros: 'Escolha pelo menos um número.'
@@ -1631,7 +1643,7 @@ function verPedido(codigo) {
    Reservas quase vencendo (painel)
    ===================================================================== */
 function venceLogo(v) {
-  if (v.pago || liberada(v) || vencida(v) || !(v.numeros || []).length) return false;
+  if (v.pago || v.semPrazo || liberada(v) || vencida(v) || !(v.numeros || []).length) return false;
   return prazoDe(v).getTime() - Date.now() <= 3 * 3600000;
 }
 function faltaTexto(v) {
@@ -1780,6 +1792,43 @@ function atualizarBotaoDuvidas() {
   }
   b.href = linkDuvidas();
   b.hidden = !mostrar;
+}
+
+
+/* =====================================================================
+   Carrinho, pausa das vendas
+   ===================================================================== */
+const ICONE_CARRINHO = '<svg class="ic-carrinho" viewBox="0 0 24 24" aria-hidden="true" width="22" height="22"><path d="M2.5 4h2.2l2.3 10.1a1.6 1.6 0 0 0 1.6 1.2h8.3a1.6 1.6 0 0 0 1.5-1.1l2.2-6.6H6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9.6" cy="19.4" r="1.7" fill="currentColor"/><circle cx="17" cy="19.4" r="1.7" fill="currentColor"/></svg>';
+let ultimoCarrinho = 0;
+function htmlCarrinho(n) {
+  const pula = n !== ultimoCarrinho;
+  ultimoCarrinho = n;
+  return '<span class="carrinho' + (pula ? ' pula' : '') + '" aria-hidden="true">' + ICONE_CARRINHO + '<b class="num">' + n + '</b></span>';
+}
+
+const MSG_PAUSA_PADRAO = 'As vendas estão pausadas por um instante. Volto já! 💛';
+function htmlPausada() {
+  return '<div class="aviso-breve pausa"><h3>⏸️ Vendas pausadas</h3><p class="dica">' + esc(cfg.msgPausa || MSG_PAUSA_PADRAO) + '</p>' +
+    (cfg.whatsapp ? '<a class="btn peq" href="' + esc(linkWa(cfg.whatsapp, 'Oi, ' + cfg.vendedora + '! Me avisa quando a rifa voltar? 😊')) + '" target="_blank" rel="noopener">Me avisa quando voltar</a>' : '') + '</div>';
+}
+function abrirPausa() {
+  abrirFolha('pausa',
+    '<div class="folha-cab">' + cabFolha('Pausar as vendas') + '</div>' +
+    '<form class="folha-corpo" id="f-pausa" novalidate>' +
+      '<p>Enquanto estiver pausado, quem abrir a página vê os prêmios e o seu aviso, mas não consegue reservar números. Quem já tem pedido continua conseguindo pagar e te mandar o comprovante.</p>' +
+      '<div class="campo"><label for="pausa-msg">Aviso que aparece na página</label><textarea id="pausa-msg" rows="3">' + esc(cfg.msgPausa || MSG_PAUSA_PADRAO) + '</textarea></div>' +
+      '<button class="btn primario largo" type="submit" id="pausa-ok">Pausar agora</button>' +
+    '</form>');
+  $('#f-pausa').addEventListener('submit', async e => {
+    e.preventDefault();
+    $('#pausa-ok').disabled = true;
+    const msg = $('#pausa-msg').value.trim() || MSG_PAUSA_PADRAO;
+    fecharFolha();
+    await publicar(Object.assign({}, cfg, { pausado: true, msgPausa: msg }), 'Vendas pausadas. A página já mostra o seu aviso.');
+  });
+}
+async function retomarVendas() {
+  await publicar(Object.assign({}, cfg, { pausado: false }), 'Vendas retomadas! A página voltou a aceitar pedidos.');
 }
 
 /* ---------- início ---------- */

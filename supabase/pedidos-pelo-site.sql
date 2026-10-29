@@ -84,6 +84,9 @@ begin
   if cfg is null or coalesce(cfg->>'pronto', 'false') <> 'true' then
     raise exception 'vendas_fechadas';
   end if;
+  if coalesce(cfg->>'pausado', 'false') = 'true' then
+    raise exception 'vendas_pausadas';
+  end if;
   if coalesce(cfg->>'fimVendas', '') ~ '^\d{4}-\d{2}-\d{2}$'
      and now() >= (((cfg->>'fimVendas')::date + 1)::timestamp at time zone 'America/Sao_Paulo') then
     raise exception 'vendas_fechadas';

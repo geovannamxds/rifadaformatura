@@ -20,41 +20,6 @@ create table if not exists public.integracoes (
 alter table public.integracoes enable row level security;
 revoke all on public.integracoes from anon, authenticated;
 
--- Libera reservas vencidas só quando existe alguma (evita mexer no banco à toa a cada 10 minutos)
-create or replace function public.liberar_vencidas(poupar uuid default null)
-returns integer
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  n integer;
-begin
-  if not exists (
-    select 1 from public.vendas v
-     where not v.pago
-       and v.liberada_em is null
-       and cardinality(v.numeros) > 0
-       and v.criado_em + public.prazo_reserva() < now()
-       and (poupar is null or v.id <> poupar)
-  ) then
-    return 0;
-  end if;
-  update public.vendas v
-     set numeros_liberados = v.numeros,
-         numeros = '{}',
-         liberada_em = now(),
-         atualizado_em = now()
-   where not v.pago
-     and v.liberada_em is null
-     and cardinality(v.numeros) > 0
-     and v.criado_em + public.prazo_reserva() < now()
-     and (poupar is null or v.id <> poupar);
-  get diagnostics n = row_count;
-  return n;
-end;
-$$;
-
 -- Manda a lista completa de vendas pra planilha
 create or replace function public.enviar_planilha()
 returns bigint
@@ -80,7 +45,15 @@ begin
         'codigo', v.codigo, 'nome', v.nome, 'telefone', v.telefone,
         'numeros', to_jsonb(v.numeros), 'liberados', to_jsonb(v.numeros_liberados),
         'pago', v.pago, 'bilhete', v.bilhete, 'obs', v.obs,
-        'criado', v.criado_em, 'pago_em', v.pago_em, 'liberada', v.liberada_em, 'origem', v.origem
+        'criado', v.criado_em, 'pago_em', v.pago_em, 'liberada', v.liberada_em, 'origem', v.origem,
+        'origem_txt', case v.origem when 'site' then 'Site' when 'presencial' then 'Presencial' else 'Painel' end,
+        'situacao', case
+          when v.pago then 'Pago'
+          when cardinality(v.numeros) = 0 and v.liberada_em is not null then 'Liberada (não pagou no prazo)'
+          when v.sem_prazo then 'Reservado (paga depois)'
+          when v.criado_em + public.prazo_reserva() < now() then 'Reserva vencida'
+          else 'Aguardando pagamento'
+        end
       ) order by v.criado_em)
       from public.vendas v
     ), '[]'::jsonb)

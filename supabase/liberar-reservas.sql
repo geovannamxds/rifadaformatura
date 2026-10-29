@@ -12,6 +12,7 @@
 
 alter table public.vendas add column if not exists liberada_em timestamptz;
 alter table public.vendas add column if not exists numeros_liberados int[] not null default '{}';
+alter table public.vendas add column if not exists sem_prazo boolean not null default false;
 
 -- Prazo de reserva configurado no painel (em horas; 24 se não houver)
 create or replace function public.prazo_reserva()
@@ -44,6 +45,7 @@ begin
      where not v.pago
        and v.liberada_em is null
        and cardinality(v.numeros) > 0
+       and not v.sem_prazo
        and v.criado_em + public.prazo_reserva() < now()
        and (poupar is null or v.id <> poupar)
   ) then
@@ -57,6 +59,7 @@ begin
    where not v.pago
      and v.liberada_em is null
      and cardinality(v.numeros) > 0
+     and not v.sem_prazo
      and v.criado_em + public.prazo_reserva() < now()
      and (poupar is null or v.id <> poupar);
   get diagnostics n = row_count;
@@ -109,7 +112,7 @@ as $$
       from (
         select distinct unnest(v.numeros) as n
         from public.vendas v
-        where v.pago or v.criado_em + public.prazo_reserva() >= now()
+        where v.pago or v.sem_prazo or v.criado_em + public.prazo_reserva() >= now()
       ) s
     ), '[]'::jsonb),
     'atualizado', (select c.atualizado_em from public.config c where c.id = 1)

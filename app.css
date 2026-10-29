@@ -379,3 +379,19 @@ a.ig{color:inherit;font-weight:700;text-decoration:none}
 .duvidas{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:18;display:inline-flex;align-items:center;gap:8px;padding:10px 16px 10px 12px;border-radius:999px;background:var(--hero);color:var(--hero-ink);border:2px solid var(--b-borda);box-shadow:0 4px 0 var(--b-borda),var(--shadow);font-weight:700;font-size:.9rem;text-decoration:none;transition:transform .08s ease,box-shadow .08s ease}
 .duvidas:active{transform:translateY(3px);box-shadow:0 1px 0 var(--b-borda)}
 .duvidas svg{flex:none}
+
+/* carrossel: cartões com largura fixa, todos podem ficar no centro (também no computador) */
+.trilho{padding:14px calc(50% - min(170px, 40vw)) 30px!important;scroll-padding-inline:0!important}
+.slide{flex:0 0 auto!important;width:min(340px,80vw)}
+/* carrinho */
+.carrinho{position:relative;flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:var(--c5);color:var(--on-c);border:2px solid var(--b-borda);box-shadow:0 3px 0 var(--b-borda)}
+.carrinho b{position:absolute;top:-9px;right:-9px;min-width:23px;height:23px;padding:0 5px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-size:.78rem;display:grid;place-items:center;border:2px solid var(--surface)}
+.carrinho.pula{animation:pula .5s cubic-bezier(.3,1.6,.5,1)}
+@keyframes pula{0%{transform:scale(1)}35%{transform:scale(1.2) rotate(-8deg)}100%{transform:scale(1) rotate(0)}}
+.barra-in{justify-content:flex-start}
+.barra-in .barra-acoes{margin-left:auto}
+.tit-carrinho{display:inline-grid;place-items:center;width:36px;height:36px;margin-right:10px;border-radius:11px;background:var(--c5);color:var(--on-c);vertical-align:-6px;border:2px solid var(--b-borda)}
+.tit-carrinho svg{width:20px;height:20px}
+/* pausa */
+.aviso-breve.pausa{border-color:var(--accent);background:var(--accent-soft)}
+.aviso-breve.pausa .btn{justify-self:start}
