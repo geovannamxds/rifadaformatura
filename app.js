@@ -84,7 +84,7 @@ function foneBonito(s) {
   if (d.length === 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6);
   return String(s || '');
 }
-function linkWa(fone, texto) { return 'https://wa.me/' + foneWa(fone) + '?text=' + encodeURIComponent(texto); }
+function linkWa(fone, texto) { const n = foneWa(fone); return 'https://api.whatsapp.com/send?' + (n ? 'phone=' + n + '&' : '') + 'text=' + encodeURIComponent(texto); }
 function diaSemana(iso) { try { return new Date(iso + 'T12:00:00-03:00').toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' }); } catch (e) { return ''; } }
 function prazoDe(v) { const t = Date.parse(v.criadoEm || ''); return new Date((isNaN(t) ? Date.now() : t) + (Number(cfg.prazoReserva) || 24) * 3600000); }
 function liberada(v) { return !!v.liberadaEm && !(v.numeros || []).length; }
@@ -507,7 +507,7 @@ function renderPublico() {
         (esgotado
           ? '<h2 id="t-ajude">Valeu <em>demais</em>!</h2><p>Os números esgotaram. Muito obrigada! 💛🎓</p>'
           : '<h2 id="t-ajude">Me ajuda a <em>vender</em>?</h2><p>Mandar o link pra família e pros amigos já ajuda muito. Muito obrigada! 💛🎓</p>' +
-            '<div class="linha-botoes"><a class="btn primario" href="' + esc('https://wa.me/?text=' + encodeURIComponent(msgDivulgar(false))) + '" target="_blank" rel="noopener">Mandar no WhatsApp</a>' +
+            '<div class="linha-botoes"><a class="btn primario" href="' + esc('https://api.whatsapp.com/send?text=' + encodeURIComponent(msgDivulgar(false))) + '" target="_blank" rel="noopener">Mandar no WhatsApp</a>' +
             (cfg.link ? '<button class="btn" type="button" data-copiar="' + esc(cfg.link) + '">Copiar link</button>' : '') + '</div>') +
       '</div></section>' +
     '</main>' +
@@ -650,7 +650,7 @@ function abrirCompartilhar() {
         ? '<div class="campo"><span class="rotulo">Link da página</span><div class="copia"><code>' + esc(cfg.link) + '</code><button class="btn peq" type="button" data-copiar="' + esc(cfg.link) + '">Copiar</button></div></div>'
         : '<p class="dica">O link aparece aqui assim que a página estiver publicada.</p>') +
       '<div class="campo"><span class="rotulo">Mensagem pronta</span><p class="nota">' + esc(texto).replace(/\n/g, '<br>') + '</p></div>' +
-      '<div class="linha-botoes"><a class="btn primario" href="' + esc('https://wa.me/?text=' + encodeURIComponent(texto)) + '" target="_blank" rel="noopener">Mandar no WhatsApp</a><button class="btn" type="button" data-copiar="' + esc(texto) + '">Copiar mensagem</button></div>' +
+      '<div class="linha-botoes"><a class="btn primario" href="' + esc('https://api.whatsapp.com/send?text=' + encodeURIComponent(texto)) + '" target="_blank" rel="noopener">Mandar no WhatsApp</a><button class="btn" type="button" data-copiar="' + esc(texto) + '">Copiar mensagem</button></div>' +
       (daDona && !TEM_SB ? '<p class="dica">Pra quem não tem conta no Claude conseguir abrir, deixe a página compartilhada por link público (menu Compartilhar do artifact).</p>' : '') +
     '</div>');
 }

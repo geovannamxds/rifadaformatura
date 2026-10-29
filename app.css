@@ -491,11 +491,19 @@ label.anexar.enviando{opacity:.7;cursor:progress;pointer-events:none}
 .cel.minha-res{background:color-mix(in srgb,var(--c2) 28%,var(--surface));border:2px solid var(--c2);color:var(--ink);box-shadow:0 3px 0 color-mix(in srgb,var(--c2) 70%,#000);cursor:default}
 .amostra.minha-res{background:color-mix(in srgb,var(--c2) 28%,var(--surface));border:2px solid var(--c2)}
 /* ---------- botão "Meus pedidos" (pessoinha) e aviso de pedido vencido ---------- */
-.btn-conta{position:absolute;z-index:3;top:28px;right:max(16px,env(safe-area-inset-right,0px));width:44px;height:44px;border-radius:50%;display:grid;place-items:center;
-  background:color-mix(in srgb,var(--hero-ink) 12%,transparent);color:var(--hero-ink);border:1.5px solid color-mix(in srgb,var(--hero-ink) 60%,transparent);cursor:pointer;padding:0}
-.btn-conta:hover{background:color-mix(in srgb,var(--hero-ink) 20%,transparent)}
+.btn-conta{position:absolute;z-index:3;top:26px;right:max(16px,env(safe-area-inset-right,0px));width:46px;height:46px;border-radius:50%;display:grid;place-items:center;cursor:pointer;padding:0;
+  color:#0E2A33;border:1.5px solid rgba(255,255,255,.75);
+  background:radial-gradient(120% 90% at 30% 20%,color-mix(in srgb,var(--c2) 55%,#fff) 0%,color-mix(in srgb,var(--c2) 92%,transparent) 55%,color-mix(in srgb,var(--c2) 70%,transparent) 100%);
+  -webkit-backdrop-filter:blur(10px) saturate(1.8);backdrop-filter:blur(10px) saturate(1.8);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.9),inset 0 -8px 14px rgba(14,42,51,.18),0 0 0 4px color-mix(in srgb,var(--c2) 22%,transparent),0 10px 20px -8px rgba(0,0,0,.55);
+  transition:transform .2s ease,box-shadow .2s ease}
+.btn-conta::before{content:"";position:absolute;inset:3px 6px auto;height:46%;border-radius:999px;background:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,0));pointer-events:none}
+.btn-conta svg{position:relative}
+.btn-conta:hover{transform:translateY(-1px) scale(1.04)}
+.btn-conta:active{transform:scale(.96)}
 .btn-conta:focus-visible{outline:3px solid var(--c5);outline-offset:3px}
-.conta-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--c5);color:var(--on-c);font:800 .72rem/20px var(--f-display);text-align:center}
+.conta-badge{position:absolute;top:-5px;right:-5px;min-width:21px;height:21px;padding:0 5px;border-radius:999px;background:var(--c5);color:var(--on-c);font:800 .72rem/21px var(--f-display);text-align:center;box-shadow:0 0 0 2px var(--hero),0 2px 6px rgba(0,0,0,.3)}
+@media (prefers-reduced-motion:reduce){.btn-conta{transition:none}}
 .hero .selo{margin-right:56px}
 .conta .meus-pedidos{margin:0}
 .conta-form{display:grid;gap:12px;padding:16px;border-radius:16px;background:var(--surface-2)}
