@@ -30,7 +30,7 @@ Deno.serve(async () => {
     for (const a of lote.avisos) {
       for (const i of (lote.inscricoes ?? [])) {
         let st = 0, txt = '';
-        try { const r = await mandar(i, { titulo: a.titulo, corpo: a.corpo, url: a.url, tag: a.tag }, jwk, lote.contato || 'mailto:rifa@example.com', { topico: a.tag || undefined }); st = r.status; txt = r.txt; }
+        try { const r = await mandar(i, { titulo: a.titulo, corpo: a.corpo, url: a.url, tag: a.tag }, jwk, lote.contato || 'mailto:rifa@example.com', {}); /* sem Topic: a Apple recusa (BadWebPushTopic) */ st = r.status; txt = r.txt; }
         catch (e) { st = -1; txt = String(e).slice(0, 200); }
         resultados.push({ aviso: a.id, inscricao: i.id, status: st, txt });
       }

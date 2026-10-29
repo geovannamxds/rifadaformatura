@@ -3002,7 +3002,7 @@ async function testarAvisos(silencioso) {
       const res = data && data.resultado;
       if (Array.isArray(res) && res.length) {
         const ok = res.filter(r => r.status >= 200 && r.status < 300).length;
-        if (!silencioso || !ok) toast(ok ? 'Aviso de teste enviado pra ' + ok + ' ' + plural(ok, 'aparelho', 'aparelhos') + '. Chegou? 🔔' : 'O aviso não chegou nos aparelhos (erro ' + res[0].status + '). Desligue e ligue de novo.');
+        if (!silencioso || !ok) toast(ok ? 'Aviso de teste enviado pra ' + ok + ' ' + plural(ok, 'aparelho', 'aparelhos') + '. Chegou? 🔔' : 'O aviso não chegou nos aparelhos (erro ' + res[0].status + (res[0].txt ? ': ' + String(res[0].txt).replace(/[{}"]/g, '').slice(0, 60) : '') + '). Me manda um print dessa mensagem.');
         return;
       }
     }
