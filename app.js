@@ -1702,7 +1702,7 @@ function abrirPagamento(p) {
         (servidorNovo
           ? '<li><h3>Anexe o comprovante</h3><p>Depois de pagar, anexe aqui o print ou o PDF do comprovante do Pix. É assim que o seu pedido fica guardado enquanto eu confiro.</p>' +
             htmlAnexar(p) + '<p class="erro" id="p-arq-erro" role="alert" hidden></p>' +
-            (avisarWa ? '<p class="dica">Prefere mandar pelo WhatsApp? <a class="link" href="' + esc(avisarWa) + '" target="_blank" rel="noopener" data-acao="mandou-comprovante" data-codigo="' + esc(p.codigo) + '">Mandar no WhatsApp</a>' + (cfg.whatsapp ? ' (' + esc(foneBonito(cfg.whatsapp)) + ', com o código <strong>' + esc(p.codigo) + '</strong>)' : '') + '.</p>' : '')
+            (avisarWa ? '<p class="dica">Prefere mandar pelo WhatsApp? <a class="link" href="' + esc(avisarWa) + '" target="_blank" rel="noopener" data-acao="mandou-comprovante" data-codigo="' + esc(p.codigo) + '">Mandar no WhatsApp</a>' + (cfg.whatsapp ? ' · ' + esc(foneBonito(cfg.whatsapp)) + ' · código <strong>' + esc(p.codigo) + '</strong>' : '') + '</p>' : '')
           : '<li><h3>Me mande o comprovante</h3><p>Depois de pagar, toque no botão: o WhatsApp abre com o seu pedido pronto. É só anexar o comprovante do Pix.</p>' +
             (avisarWa ? '<a class="btn primario largo" href="' + esc(avisarWa) + '" target="_blank" rel="noopener" data-acao="mandou-comprovante" data-codigo="' + esc(p.codigo) + '">Já paguei: mandar comprovante</a>' +
               '<p class="dica">Se o WhatsApp não abrir, mande o comprovante pro número <span class="num">' + esc(foneBonito(cfg.whatsapp)) + '</span> com o código <strong>' + esc(p.codigo) + '</strong> · <button class="link" type="button" data-copiar="' + esc(soDigitos(cfg.whatsapp)) + '">copiar número</button></p>' : '')) +
@@ -2208,7 +2208,7 @@ function baixarArquivos(arqs) {
    ===================================================================== */
 const LIMITE_PEDIDOS_ABERTOS = 2;
 /* o comprovante pelo site e a situação do pedido só ligam quando o banco já tem essas funções */
-let servidorNovo = false;
+let servidorNovo = true; /* o banco já foi atualizado (comprovante-e-situacao.sql), então vale desde a primeira tela */
 
 function textoOcupado(n) {
   return reservadosPub.has(n) ? 'O ' + n + ' está reservado pra outra pessoa. Escolha outro.' : 'O ' + n + ' já foi vendido. Escolha outro.';
