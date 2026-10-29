@@ -43,7 +43,7 @@ const CFG_PADRAO = {
 
 let MIDIA = {};
 try { MIDIA = JSON.parse($('#midia').textContent || '{}'); } catch (e) { MIDIA = {}; }
-if (!MIDIA.p1) ['p1', 'p2', 'p3', 'p4', 'p5'].forEach(k => { MIDIA[k] = RAIZ + 'img/' + k + '.webp'; });
+if (!MIDIA.p1) ['p1', 'p2', 'p3', 'p4', 'p5'].forEach(k => { MIDIA[k] = RAIZ + 'img/' + k + '-v2.webp'; });
 let estadoPub = {};
 try { estadoPub = JSON.parse($('#estado').textContent || '{}'); } catch (e) { estadoPub = {}; }
 let cfg = Object.assign({}, CFG_PADRAO, estadoPub.cfg || {});
@@ -374,6 +374,7 @@ function desenharRabiscosPorFaixa() {
 
 /* ---------- carrossel dos prêmios ---------- */
 const CORES_PREMIO = ['#FEEAD1', '#61C4E1', '#F1BFC0', '#87B9A0', '#FCBA59'];
+const SOMBRA_PREMIO = ['72%', '52%', '34%', '64%', '80%']; /* largura da sombrinha no "chão" de cada prêmio */
 let carrosselTimer = null, irPremio = null, pausarCarrossel = () => {};
 function htmlPremios() {
   const imgs = ['p1', 'p2', 'p3', 'p4', 'p5'];
@@ -383,7 +384,7 @@ function htmlPremios() {
       const src = MIDIA[imgs[i]] || '';
       return '<article class="slide" style="--cor:' + (CORES_PREMIO[i] || CORES_PREMIO[0]) + '" aria-roledescription="slide" aria-label="' + (i + 1) + ' de ' + n + '">' +
         '<div class="slide-topo"><span class="slide-pos">' + (i + 1) + 'º</span><span class="slide-tag">prêmio</span></div>' +
-        (src ? '<img src="' + src + '" alt="' + esc(p) + '">' : '') +
+        (src ? '<div class="slide-foto" style="--sombra:' + (SOMBRA_PREMIO[i] || '60%') + '"><img src="' + src + '" alt="' + esc(p) + '" width="1200" height="900" decoding="async"></div>' : '') +
         '<h3 class="slide-nome">' + esc(p) + '</h3></article>';
     }).join('') + '</div>' +
     '<div class="carrossel-ctrl"><button type="button" class="btn peq icone" data-acao="prem-ant" aria-label="Prêmio anterior">‹</button>' +

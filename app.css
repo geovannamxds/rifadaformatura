@@ -596,3 +596,12 @@ details.dia .btn{margin-bottom:12px}
 .abas{overflow-x:auto;scrollbar-width:none}
 .abas::-webkit-scrollbar{display:none}
 @media (max-width:420px){.abas{gap:2px}.aba{flex:1 0 auto;font-size:.8rem;padding:0 7px;min-width:0}}
+
+/* v14: prêmio recortado, no mesmo fundo de vidro do card */
+.slide-foto{position:relative;aspect-ratio:4/3;display:grid;place-items:center;margin:2px -6px 0}
+.slide-foto::before{content:"";position:absolute;inset:4% 8% 12%;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,.5),rgba(255,255,255,.18) 55%,rgba(255,255,255,0));pointer-events:none}
+.slide-foto::after{content:"";position:absolute;left:50%;bottom:5%;width:var(--sombra,60%);height:9%;transform:translateX(-50%);border-radius:50%;background:radial-gradient(closest-side,rgba(19,36,31,.32),rgba(19,36,31,.12) 55%,rgba(19,36,31,0));pointer-events:none;transition:transform .45s cubic-bezier(.2,.8,.2,1.15),opacity .45s}
+.slide .slide-foto img{position:relative;z-index:1;width:100%;height:100%;aspect-ratio:auto;object-fit:contain;border-radius:0;box-shadow:none;background:none;filter:drop-shadow(0 12px 14px rgba(19,36,31,.22));transform:translateY(0) scale(.97);transition:transform .45s cubic-bezier(.2,.8,.2,1.15)}
+.slide.ativo .slide-foto img{transform:translateY(-6px) scale(1)}
+.slide.ativo .slide-foto::after{transform:translateX(-50%) scale(.9);opacity:.85}
+@media (prefers-reduced-motion:reduce){.slide .slide-foto img,.slide-foto::after{transition:none}}
