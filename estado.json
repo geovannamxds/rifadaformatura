@@ -4,12 +4,12 @@
   "pronto": true,
   "vendedora": "Geo",
   "titulo": "Rifa da formatura",
-  "subtitulo": "Oi, aqui é a Geo! Que bom te ver por aqui! 💛🎓\nCada número que você compra me deixa um passo mais perto da formatura, e eu fico muito grata pela ajuda. Pra participar é fácil: escolha seus números, pague por Pix e me mande o pedido no WhatsApp. Assim que eu confirmar, te envio o bilhete digital.",
+  "subtitulo": "Oi, aqui é a Geo! Que bom te ver por aqui! 💛🎓\nCada número que você compra me deixa um passo mais perto da formatura, e eu fico muito grata pela ajuda. Pra participar é fácil: escolha seus números, coloque seu nome e WhatsApp e gere o Pix. Depois de pagar, é só me mandar o comprovante pelo botão que aparece na tela. Assim que eu confirmar, te envio o bilhete digital.",
   "msgs": {
    "pedido": "Oi, {vendedora}! Vim pela página da rifa e quero participar 🎉\nNome: {nome}\nNúmeros: {numeros}\nTotal: {total}\nJá te mando o comprovante do Pix aqui.",
    "bilhete": "Oi, {nome}! Pagamento confirmado, muito obrigada pela ajuda! 💛🎓\nSeus números da rifa: {numeros}\nJá vou te mandar os bilhetes digitais aqui. Guarda eles até o sorteio, tá?\nO sorteio é dia {sorteio}, ao vivo no {instagram}. Boa sorte!",
    "cobranca": "Oi, {nome}! Tudo bem? Separei pra você os números {numeros} da rifa da formatura 😊\nO total ficou {total}. Minha chave Pix é {chave}.\nPra garantir seus números, o pagamento precisa chegar até {prazo}, tá? Depois disso eles voltam a ficar livres.\nQuando pagar, me manda o comprovante aqui. Obrigada!",
-   "divulgar": "Gente, tô vendendo a rifa da minha formatura! 🎓\nSão 5 prêmios: {premios}. Cada número custa {preco} e o sorteio é dia {sorteio}.\nEscolhe os seus aqui: {link}\nCada número me ajuda muito, obrigada!",
+   "divulgar": "Oi, gente! 💛🎓 Tô vendendo a rifa da minha formatura e montei uma página pra facilitar a compra:\n👉 {link}\n\nSão 5 prêmios: {premios}. Cada número custa {preco}.\n\nComo comprar:\n1️⃣ Abra o link e toque nos números que você quiser (até 20 por pedido)\n2️⃣ Toque em Continuar, coloque seu nome e WhatsApp e toque em \"Gerar Pix e reservar\". Seus números ficam guardados pra você por 24 horas\n3️⃣ Pague pelo Pix copia e cola ou pelo QR Code que aparece na tela\n4️⃣ Toque em \"Já paguei: mandar comprovante\" e me mande o comprovante no WhatsApp\n5️⃣ Assim que eu confirmar, te mando o bilhete digital de cada número 🎟️\n\nO sorteio é dia {sorteio}, ao vivo no Instagram {instagram}, e as vendas vão até 15/03. Qualquer dúvida, é só me chamar!\n\nCada número me ajuda muito, obrigada! 💛",
    "divulgarAmigos": "Tô ajudando a {vendedora} com a rifa da formatura dela! 🎓 São 5 prêmios, incluindo um {premio1}, e cada número custa {preco}.\nEscolhe os seus aqui: {link}"
   },
   "preco": 5,
