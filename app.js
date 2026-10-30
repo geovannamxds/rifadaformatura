@@ -220,6 +220,7 @@ function msgPedido(nome, nums, codigo) {
   return preencher(tpl, Object.assign(varsVenda(nome, nums, true), { pedido: codigo || '' }));
 }
 function msgBilhete(v) { return preencher(msgModelo('bilhete'), varsVenda(v.nome, ordenar(v.numeros || []), false)); }
+function listaPremiosTexto() { const p = cfg.premios.map((x, i) => i ? x.charAt(0).toLowerCase() + x.slice(1) : x).map(x => x.replace(/ jbl$/i, ' JBL').replace(/^nintendo switch$/i, 'Nintendo Switch')); return p.length > 1 ? p.slice(0, -1).join(', ') + ' e ' + p[p.length - 1] : (p[0] || ''); }
 function colarEmojis(s) { return String(s).replace(/(\p{Extended_Pictographic}\uFE0F?)\s?(?=\p{Extended_Pictographic})/gu, '$1\u2060'); }
 function msgCobranca(v) {
   let tpl = String(msgModelo('cobranca'));
@@ -504,12 +505,13 @@ function renderPublico() {
         '<li><span class="bola">3</span><strong>Retire o prêmio</strong><span>A Formô tem até ' + cfg.prazoEntrega + ' dias corridos pra entregar, contados desse primeiro contato. A retirada é na sede da Formô, em Curitiba. Mora fora? O frete é combinado à parte com a Formô.</span></li>' +
       '</ol></div></section>' +
       '<section class="wrap secao" aria-labelledby="t-duvidas"><h2 id="t-duvidas">Dúvidas</h2><div class="faq">' +
+        '<details><summary>Essa rifa é pra quê?</summary><p>É pra me ajudar a pagar a minha formatura! Não tem nada a ver com a faculdade 😊 O valor de cada número que eu vendo vai pra minha formatura.</p></details>' +
         '<details><summary>Quando é o sorteio?</summary><p>' + diaSemana(cfg.sorteio).replace(/^./, c => c.toUpperCase()) + ', ' + dataBR(cfg.sorteio) + ', ao vivo no Instagram ' + igLink() + '.</p><p><strong>🚨 Atenção:</strong> as vendas vão até o dia ' + dataBR(cfg.fimVendas) + '.</p></details>' +
         '<details><summary>Posso comprar mais de um número?</summary><p>Pode sim, quantos quiser!' + (TEM_SB ? ' Cada pedido vai até ' + MAX_POR_PEDIDO + ' números; se quiser mais, é só fazer outro pedido.' : '') + ' No sorteio saem 5 números, um para cada prêmio. Cada número que você compra é mais uma chance de estar entre eles, então quanto mais números, maiores as suas chances.</p></details>' +
         '<details><summary>Escolhi meus números. Eles já são meus?</summary><p>Ainda não! Escolher na página não separa nenhum número. ' + (TEM_SB ? 'Quando você coloca seu nome e WhatsApp e gera o Pix, os números ficam reservados pra você por ' : 'Quando você me manda o pedido no WhatsApp, eu reservo os números pra você por ') + P + '. ' + (TEM_SB ? 'Se você anexar o comprovante nesse prazo, eles ficam guardados até eu confirmar o pagamento, e aí são seus. Se não, voltam a ficar livres pra outra pessoa.' : 'Se o pagamento chegar nesse prazo, eles são seus; se não, voltam a ficar livres pra outra pessoa.') + '</p></details>' +
         '<details><summary>Meu número está garantido no sorteio?</summary><p>Depois que eu confirmo o seu pagamento, o número é seu. Eu registro cada venda e pago o bloco à Formô na conferência, de ' + esc(cfg.conferencia) + ', e é isso que coloca os números no sorteio.</p></details>' +
         '<details><summary>Vou receber um bilhete de papel?</summary><p>Não, a rifa é 100% digital: cada número é um bilhete em imagem, que chega pelo WhatsApp. Guarde essas imagens até o sorteio. Se quiser, dá pra imprimir.</p></details>' +
-        '<details><summary>Quem organiza a rifa?</summary><p>A Formô, empresa que organiza a formatura, e o sorteio é feito por ela. O valor dos números vai para a arrecadação da minha formatura.</p></details>' +
+        '<details><summary>Quem organiza a rifa?</summary><p>Quem organiza é a Formô, a empresa que cuida da nossa formatura, e é ela que faz o sorteio, ao vivo no Instagram ' + igLink() + '. Os prêmios são sorteados entre todos os bilhetes vendidos por mim e pelos formandos que também estão participando da ação.</p><p>Nessa primeira rifa são ' + cfg.premios.length + ' prêmios: ' + esc(listaPremiosTexto()) + '.</p></details>' +
       '</div></section>' +
       '<section class="banda banda-verde" aria-labelledby="t-ajude"><canvas class="rabiscos" data-preset="verde" aria-hidden="true"></canvas><div class="wrap secao">' +
         (esgotado
